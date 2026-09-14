@@ -29,6 +29,18 @@ var AY_KOK   = "arsiv-kok-id";
 var TRMAP = {"Ç":"C","ç":"C","Ğ":"G","ğ":"G","İ":"I","ı":"I","Ö":"O","ö":"O","Ş":"S","ş":"S","Ü":"U","ü":"U"};
 function nrm(s){ return String(s||"").replace(/[ÇçĞğİıÖöŞşÜü]/g, function(c){ return TRMAP[c]; }).toUpperCase(); }
 function trUpper(s){ try{ return String(s||"").toLocaleUpperCase("tr"); }catch(e){ return String(s||"").toUpperCase(); } }
+/* Yazarken büyük harfe çevirir ama imleci bulunduğu yerde bırakır.
+   (input.value'ya atama yapmak imleci sona atar; bu yüzden konum geri konuyor.) */
+function buyukHarfBagla(inp, kosul){
+  inp.addEventListener("input", function(){
+    if(kosul && !kosul()) return;
+    var bas = inp.selectionStart, son = inp.selectionEnd;
+    var yeni = trUpper(inp.value);
+    if(yeni === inp.value) return;
+    inp.value = yeni;
+    if(bas !== null){ try{ inp.setSelectionRange(bas, son); }catch(e){} }
+  });
+}
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
 function $(id){ return document.getElementById(id); }
 function gunAy(t){
@@ -630,7 +642,7 @@ function taniDuzenle(dugme, p){
     + '<button class="btn btn-primary mini" data-kaydet>Kaydet</button>';
   dugme.closest(".eylemler").after(kutu);
   var inp = kutu.querySelector("input");
-  inp.addEventListener("input", function(){ inp.value = trUpper(inp.value); });
+  buyukHarfBagla(inp);
   inp.focus();
   kutu.querySelector("[data-kaydet]").addEventListener("click", function(){
     var metin = inp.value.trim();
@@ -661,7 +673,7 @@ function adDuzenle(dugme, p){
     + '<button class="btn btn-primary mini" data-kaydet>Adı değiştir</button>';
   dugme.closest(".eylemler").after(kutu);
   var inp = kutu.querySelector("input");
-  inp.addEventListener("input", function(){ inp.value = trUpper(inp.value); });
+  buyukHarfBagla(inp);
   kutu.querySelector("[data-kaydet]").addEventListener("click", function(){
     var yeni = inp.value.trim();
     if(yeni.length < 3 || yeni === p.h){ kartDurum(dugme, "Yeni bir ad yaz.", ""); return; }
@@ -983,8 +995,8 @@ function olaylariBagla(){
   ["nad", "ntarih", "ntani"].forEach(function(k){
     $(k).addEventListener("input", yolCiz);
   });
-  $("nad").addEventListener("input", function(){ if(!kilitliHasta) $("nad").value = trUpper($("nad").value); });
-  $("ntani").addEventListener("input", function(){ $("ntani").value = trUpper($("ntani").value); });
+  buyukHarfBagla($("nad"), function(){ return !kilitliHasta; });
+  buyukHarfBagla($("ntani"));
 
   var alan = $("dosyaalani"), girdi = $("ndosya");
   alan.addEventListener("click", function(){ girdi.click(); });
