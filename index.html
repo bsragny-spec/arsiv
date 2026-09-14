@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B646E">
+<title>Oküler Onkoloji Arşivi</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+:root{
+  --ground:#EDF0F0; --surface:#FFFFFF; --surface-2:#F6F8F8;
+  --ink:#0F1618; --ink-2:#38484C; --muted:#65777B; --faint:#8C9DA1;
+  --line:#D3DCDD; --line-soft:#E4EAEB;
+  --accent:#0B646E; --accent-ink:#FFFFFF; --accent-soft:#DDEEEF; --accent-line:#9CC9CD;
+  --amber:#8A5A0C; --amber-soft:#F6EBD7;
+  --ok:#256B4A; --ok-soft:#DDEEE5;
+  --bad:#93341F; --bad-soft:#F7E3DD;
+  --shadow:0 1px 2px rgba(15,22,24,.06), 0 8px 24px -12px rgba(15,22,24,.18);
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0A0F11; --surface:#121A1C; --surface-2:#161F22;
+    --ink:#E3EBEC; --ink-2:#B7C6C9; --muted:#87999E; --faint:#66787D;
+    --line:#222F33; --line-soft:#1B2528;
+    --accent:#3BAFBB; --accent-ink:#04191C; --accent-soft:#0E2B30; --accent-line:#1F4D55;
+    --amber:#D9A24A; --amber-soft:#2B2114;
+    --ok:#6BC095; --ok-soft:#122A21;
+    --bad:#E0866A; --bad-soft:#2C1912;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0A0F11; --surface:#121A1C; --surface-2:#161F22;
+  --ink:#E3EBEC; --ink-2:#B7C6C9; --muted:#87999E; --faint:#66787D;
+  --line:#222F33; --line-soft:#1B2528;
+  --accent:#3BAFBB; --accent-ink:#04191C; --accent-soft:#0E2B30; --accent-line:#1F4D55;
+  --amber:#D9A24A; --amber-soft:#2B2114;
+  --ok:#6BC095; --ok-soft:#122A21;
+  --bad:#E0866A; --bad-soft:#2C1912;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ground); color:var(--ink);
+  font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  -webkit-text-size-adjust:100%;
+}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+img{max-width:100%}
+[hidden]{display:none!important}
+button{font:inherit}
+
+/* ---------- iskelet ---------- */
+header{
+  position:sticky;top:0;z-index:40;background:var(--surface);
+  border-bottom:1px solid var(--line-soft);
+  padding-top:env(safe-area-inset-top);
+}
+.hwrap{max-width:1040px;margin:0 auto;padding:12px 18px 0;display:flex;flex-direction:column;gap:10px}
+.brand{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand h1{font-size:16px;margin:0;letter-spacing:-.01em;font-weight:650}
+.brand .sag{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tabs{display:flex;gap:2px}
+.tab{
+  appearance:none;border:none;background:none;cursor:pointer;color:var(--muted);
+  padding:9px 2px;margin-right:18px;font-size:14px;font-weight:550;
+  border-bottom:2px solid transparent;
+}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+main{max-width:1040px;margin:0 auto;padding:18px 18px calc(40px + env(safe-area-inset-bottom))}
+
+.btn{
+  appearance:none;cursor:pointer;border:1px solid var(--line);background:var(--surface);
+  color:var(--ink);padding:7px 13px;border-radius:8px;font-size:13px;font-weight:500;
+  display:inline-flex;align-items:center;gap:7px;
+  transition:border-color .12s,background .12s;text-decoration:none;
+}
+.btn:hover{border-color:var(--accent-line);background:var(--surface-2)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn-primary:hover{background:var(--accent);border-color:var(--accent);filter:brightness(1.08)}
+.btn.mini{padding:4px 10px;font-size:12px}
+.lnk{appearance:none;background:none;border:none;cursor:pointer;padding:0;font-size:12px;
+  color:var(--muted);text-decoration:underline;text-underline-offset:2px}
+.lnk:hover{color:var(--ink-2)}
+
+input[type=text],input[type=search],input[type=date],select{
+  font:inherit;color:var(--ink);background:var(--surface);
+  border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%;
+}
+input:focus,select:focus{outline:2px solid var(--accent-line);outline-offset:-1px;border-color:var(--accent-line)}
+
+.note{font-size:12.5px;color:var(--muted)}
+.durum{font-size:12.5px;color:var(--muted);min-height:1.2em}
+.durum.ok{color:var(--ok)} .durum.err{color:var(--bad)}
+.banner{border-radius:var(--r);padding:11px 13px;font-size:13.5px;border:1px solid var(--line);background:var(--surface)}
+.banner.ok{background:var(--ok-soft);border-color:transparent;color:var(--ok)}
+.banner.err{background:var(--bad-soft);border-color:transparent;color:var(--bad)}
+.banner.info{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+.banner.uyari{background:var(--amber-soft);border-color:transparent;color:var(--amber)}
+
+/* ---------- giriş / kurulum ---------- */
+.kapak{max-width:520px;margin:8vh auto;padding:0 18px;text-align:center}
+.kapak h2{font-size:20px;margin:0 0 6px}
+.kapak p{color:var(--muted);font-size:14px;margin:0 0 18px}
+.kapak .kutu{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:22px;box-shadow:var(--shadow);text-align:left}
+.kapak label{display:block;font-size:12.5px;color:var(--muted);margin:14px 0 5px}
+
+/* ---------- arama ---------- */
+.arama{position:relative;margin-bottom:12px}
+.arama input{padding-left:36px;font-size:15px}
+.arama svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.45}
+.filtreler{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
+.fgrup{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.fetiket{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-right:4px;min-width:52px}
+.cip{
+  appearance:none;cursor:pointer;border:1px solid var(--line);background:var(--surface);
+  color:var(--ink-2);border-radius:999px;padding:3px 10px;font-size:12px;
+}
+.cip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.ustcubuk{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.ustcubuk .sag{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sayim{font-size:12.5px;color:var(--muted);margin:0}
+
+.liste{display:flex;flex-direction:column;gap:7px}
+.kart{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.kbas{
+  width:100%;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+  appearance:none;border:none;background:none;cursor:pointer;color:inherit;
+  text-align:left;padding:12px 14px;font:inherit;
+}
+.kbas:hover{background:var(--surface-2)}
+.kad{font-weight:600;font-size:14.5px;letter-spacing:-.005em}
+.kmeta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted);margin-top:3px}
+.doku{background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+  font-size:10.5px;letter-spacing:.05em;color:var(--ink-2)}
+.tani{color:var(--accent)} .tani.yok{color:var(--faint);font-style:italic}
+.knum{font-size:12px;color:var(--muted);white-space:nowrap}
+.kgovde{border-top:1px solid var(--line-soft);padding:6px 14px 14px}
+
+.tl{position:relative;padding-left:18px;margin-top:10px}
+.tl::before{content:"";position:absolute;left:4px;top:8px;bottom:8px;width:1px;background:var(--line)}
+.vizit{position:relative;padding:8px 0}
+.vizit::before{content:"";position:absolute;left:-18px;top:14px;width:9px;height:9px;border-radius:50%;
+  background:var(--surface);border:2px solid var(--accent)}
+.vbas{display:flex;align-items:center;gap:8px}
+.vtarih{font-size:13px;font-weight:600;color:var(--ink-2)}
+.teknikler{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.teknik{
+  display:inline-flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface-2);border-radius:6px;padding:2px 8px;color:inherit;
+}
+.teknik:hover{border-color:var(--accent-line)}
+.teknik b{font-weight:600;letter-spacing:.03em}
+.teknik i{font-style:normal;font-size:11px;color:var(--muted)}
+.eylemler{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.x{
+  appearance:none;cursor:pointer;border:1px solid transparent;background:transparent;
+  color:var(--faint);font-size:14px;line-height:1;padding:1px 6px;border-radius:6px;opacity:.5;
+  transition:opacity .12s,color .12s,border-color .12s,background .12s;
+}
+.x:hover,.x:focus-visible{opacity:1;color:var(--bad);border-color:var(--bad);background:var(--bad-soft);outline:none}
+.vbas .x{margin-left:auto}
+.teknik .x{margin:0 -4px 0 1px;font-size:12px;padding:0 4px}
+.onay{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);
+  border:1px solid var(--bad);background:var(--bad-soft);border-radius:8px;padding:3px 4px 3px 8px}
+.onay button{appearance:none;cursor:pointer;border:1px solid var(--line);background:var(--surface);
+  color:var(--ink);border-radius:6px;font-size:12px;padding:2px 9px;font-weight:600}
+.onay button.evet{border-color:var(--bad);color:var(--bad)}
+
+/* ---------- galeri ---------- */
+.galeri{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:7px;margin-top:9px}
+.kucuk{
+  position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer;
+  background:var(--surface-2);border:1px solid var(--line);display:block;padding:0;
+}
+.kucuk img{width:100%;height:100%;object-fit:cover;display:block}
+.kucuk .ad{position:absolute;left:0;right:0;bottom:0;font-size:9.5px;padding:3px 4px;
+  background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.kucuk .yok{display:flex;align-items:center;justify-content:center;height:100%;
+  font-size:10px;color:var(--muted);padding:6px;text-align:center;word-break:break-all}
+.kucuk.secili{outline:3px solid var(--accent);outline-offset:-3px}
+
+.buyutec{position:fixed;inset:0;z-index:90;background:rgba(6,10,11,.94);display:flex;
+  flex-direction:column;align-items:center;justify-content:center;padding:14px}
+.buyutec img{max-width:100%;max-height:82vh;object-fit:contain;border-radius:8px}
+.buyutec .ust{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;
+  padding:calc(12px + env(safe-area-inset-top)) 14px 12px;color:#fff;font-size:13px}
+.buyutec .ust .sag{margin-left:auto;display:flex;gap:8px}
+.buyutec .gez{position:absolute;top:50%;transform:translateY(-50%);appearance:none;border:none;
+  background:rgba(255,255,255,.14);color:#fff;font-size:22px;width:44px;height:64px;cursor:pointer;
+  border-radius:8px;display:flex;align-items:center;justify-content:center}
+.buyutec .gez.sol{left:8px} .buyutec .gez.sag{right:8px}
+
+/* ---------- form ---------- */
+.form{display:flex;flex-direction:column;gap:16px;max-width:760px}
+.bolum{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:15px}
+.bolum h3{margin:0 0 10px;font-size:13px;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.satir{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.satir input{flex:1;min-width:190px}
+.yol{font-size:12px;color:var(--muted);word-break:break-all;margin-top:9px}
+.yol b{color:var(--ink-2);font-weight:600}
+.dosyaalani{
+  border:1.5px dashed var(--line);border-radius:var(--r);padding:20px;text-align:center;
+  cursor:pointer;color:var(--muted);font-size:13.5px;background:var(--surface-2);
+}
+.dosyaalani.uzerinde{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.secilenler{display:flex;flex-direction:column;gap:5px;margin-top:10px}
+.sdosya{display:flex;align-items:center;gap:9px;font-size:12.5px;padding:5px 8px;
+  background:var(--surface-2);border:1px solid var(--line-soft);border-radius:7px}
+.sdosya .ad{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sdosya .bo{color:var(--muted);font-size:11.5px;white-space:nowrap}
+
+.pbar{height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden;border:1px solid var(--line-soft)}
+.pbar i{display:block;height:100%;background:var(--accent);width:0;transition:width .18s}
+.ilerleme{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+.isatir{display:flex;gap:10px;font-size:12.5px;color:var(--muted)}
+.isatir .num{margin-left:auto;font-variant-numeric:tabular-nums}
+
+@media (max-width:560px){
+  .hwrap,main{padding-left:14px;padding-right:14px}
+  .kbas{grid-template-columns:1fr}
+  .knum{display:none}
+  .galeri{grid-template-columns:repeat(auto-fill,minmax(88px,1fr))}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= KURULUM / GİRİŞ ================= -->
+<section id="kapak" class="kapak">
+  <h2>Oküler Onkoloji Arşivi</h2>
+  <p>Google Drive'daki arşive doğrudan bağlanır — boyut sınırı yok.</p>
+  <div class="kutu">
+    <div id="kapakdurum" class="banner info" style="margin-bottom:14px">Hazırlanıyor…</div>
+    <div id="kimlikalani" hidden>
+      <label for="cid">Google OAuth Client ID</label>
+      <input id="cid" type="text" placeholder="…apps.googleusercontent.com" autocomplete="off" spellcheck="false">
+      <p class="note" style="margin:8px 0 0">Google Cloud → Credentials → OAuth client ID (Web application).
+      Gizli bir değer değildir; tarayıcıda çalışan uygulamalarda açıkta durur.</p>
+    </div>
+    <div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn-primary" id="baglan">Google ile bağlan</button>
+      <button class="lnk" id="kimlikdegis" hidden>Client ID'yi değiştir</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= UYGULAMA ================= -->
+<div id="uygulama" hidden>
+<header>
+  <div class="hwrap">
+    <div class="brand">
+      <h1>Oküler Onkoloji Arşivi</h1>
+      <span class="sag">
+        <span class="durum" id="genel"></span>
+        <button class="btn mini" id="yenile" title="Drive'daki değişiklikleri al">↻ Yenile</button>
+        <button class="lnk" id="cikis">çıkış</button>
+      </span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab" id="tab-ara" role="tab" aria-selected="true">Ara</button>
+      <button class="tab" id="tab-yeni" role="tab" aria-selected="false">Yeni kayıt</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- ---------- ARA ---------- -->
+  <section id="panel-ara" role="tabpanel">
+    <div class="arama">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Hasta adı, tanı, tarih (2025 · 20250124), teknik…" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="filtreler">
+      <div class="fgrup" id="fdoku"><span class="fetiket">Doku</span></div>
+      <div class="fgrup" id="ftek"><span class="fetiket">Teknik</span></div>
+      <div class="fgrup" id="ftani"><span class="fetiket">Tanı</span></div>
+    </div>
+    <div class="ustcubuk">
+      <p class="sayim" id="sayim"></p>
+      <span class="sag"><span class="durum" id="listedurum"></span></span>
+    </div>
+    <div class="liste" id="sonuclar"></div>
+  </section>
+
+  <!-- ---------- YENİ KAYIT ---------- -->
+  <section id="panel-yeni" role="tabpanel" hidden>
+    <div class="form">
+      <div id="kilitkutu" hidden></div>
+
+      <div class="bolum">
+        <h3>Doku</h3>
+        <div class="fgrup" id="ndoku"></div>
+      </div>
+
+      <div class="bolum">
+        <h3>Hasta ve vizit</h3>
+        <div class="satir">
+          <input id="nad" type="text" placeholder="AD SOYAD" autocomplete="off" spellcheck="false">
+          <input id="ntarih" type="date" style="flex:0 0 auto;width:auto;min-width:150px">
+        </div>
+        <p class="note" id="adipucu" style="margin:7px 0 0"></p>
+      </div>
+
+      <div class="bolum">
+        <h3>Teknik klasörleri</h3>
+        <div class="fgrup" id="ntek"></div>
+      </div>
+
+      <div class="bolum">
+        <h3>Görüntüler</h3>
+        <div class="dosyaalani" id="dosyaalani">
+          Dosyaları buraya sürükle ya da <b>seçmek için tıkla</b><br>
+          <span class="note">Boyut sınırı yok — tam kalitede, parça parça yüklenir.</span>
+        </div>
+        <input id="ndosya" type="file" multiple hidden accept="image/*,video/*,.pdf,.heic,.heif,.e2e,.avi,.tif,.tiff,.dcm">
+        <div class="secilenler" id="secilenler"></div>
+      </div>
+
+      <div class="bolum">
+        <h3>Tanı <span class="note" style="text-transform:none;letter-spacing:0">(isteğe bağlı)</span></h3>
+        <input id="ntani" type="text" placeholder="ör. UVEA MELANOM" autocomplete="off" spellcheck="false">
+      </div>
+
+      <div class="yol" id="yolonizleme"></div>
+      <div class="banner uyari" id="eksik" hidden></div>
+
+      <div class="satir">
+        <button class="btn btn-primary" id="olustur">Kaydı oluştur</button>
+        <button class="btn" id="iptal" hidden>Durdur</button>
+      </div>
+
+      <div class="ilerleme" id="ilerleme" hidden>
+        <div class="pbar"><i id="pfill"></i></div>
+        <div class="isatir"><span id="ptext"></span><span class="num" id="pnum"></span></div>
+      </div>
+      <div id="cikti"></div>
+    </div>
+  </section>
+</main>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
