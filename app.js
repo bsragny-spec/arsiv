@@ -24,6 +24,7 @@ var TEKNIK_ACIK = {
 var AY_CID   = "arsiv-client-id";
 var AY_DIZIN = "arsiv-dizin-v1";
 var AY_KOK   = "arsiv-kok-id";
+var AY_SENK  = "arsiv-son-senk";
 
 /* ---------------- küçük yardımcılar ---------------- */
 var TRMAP = {"Ç":"C","ç":"C","Ğ":"G","ğ":"G","İ":"I","ı":"I","Ö":"O","ö":"O","Ş":"S","ş":"S","Ü":"U","ü":"U"};
@@ -258,16 +259,16 @@ function durumSor(oturum, toplam){
    3. DİZİN — tüm arşiv yapısını Drive'dan kur
    ========================================================= */
 var VERI = [];          /* [{d,h,t,g,v:[{t,id,k:{TEK:{id,n}}}]}] */
-var DOKULAR = [], TEK_VAR = {};
+var DOKULAR = [], TEK_VAR = {}, DOKU_ID = {};
 var kokId = null;
 
 function dizinKaydet(){
-  var ok = depoYaz(AY_DIZIN, { z: Date.now(), kok: kokId, p: VERI });
+  var ok = depoYaz(AY_DIZIN, { z: Date.now(), kok: kokId, d: DOKU_ID, p: VERI });
   if(!ok) durumYaz("Dizin tarayıcıya sığmadı — her açılışta Drive'dan okunacak.", "");
 }
 function dizinYukle(){
   var x = depoOku(AY_DIZIN, null);
-  if(x && x.p && x.p.length){ VERI = x.p; kokId = x.kok || kokId; hazirla(); return x.z; }
+  if(x && x.p && x.p.length){ VERI = x.p; kokId = x.kok || kokId; DOKU_ID = x.d || {}; hazirla(); return x.z; }
   return 0;
 }
 
@@ -300,10 +301,11 @@ function dizinKur(ilerle){
     klasorler.forEach(function(f){
       (f.parents || []).forEach(function(u){ (cocuk[u] = cocuk[u] || []).push(f); });
     });
-    VERI = [];
+    VERI = []; DOKU_ID = {};
     var teknikHarita = {};                       /* teknik klasör id -> {p, v, ad} */
     (cocuk[kokId] || []).forEach(function(doku){
       if(doku.name.charAt(0) === "_") return;    /* _ARAC gibi yardımcı klasörler */
+      DOKU_ID[doku.id] = doku.name;
       (cocuk[doku.id] || []).forEach(function(hasta){
         var p = { d: doku.name, h: hasta.name, t: "", g: hasta.id, v: [] };
         (cocuk[hasta.id] || []).forEach(function(vz){
@@ -338,6 +340,7 @@ function dizinKur(ilerle){
         if(p && f.name.indexOf("TANI - ") === 0) p.t = f.name.slice(7).replace(/\.txt$/i, "");
       });
       hazirla();
+      senkZamaniYaz(new Date().toISOString().replace(/\.\d+Z$/, "Z"));
       dizinKaydet();
       return VERI.length;
     });
@@ -352,6 +355,142 @@ function kokBul(){
     if(!f) throw new Error("Drive'da \"" + KOK_AD + "\" klasörü bulunamadı.");
     kokId = f.id; depoYaz(AY_KOK, kokId); return kokId;
   });
+}
+
+/* ---------- otomatik eşitleme ----------
+   Arşivin tamamını yeniden okumak binlerce istek demek. Onun yerine Drive'a
+   "son bakıştan beri hangi dosyalar değişti" diye tek sorgu sorulur; değişen
+   dosyaların hangi hastaya ait olduğu klasör zinciri yürünerek bulunur ve
+   yalnızca o hastalar yeniden okunur. Hiçbir şey değişmemişse tek istek. */
+function senkZamani(){ return depoOku(AY_SENK, null); }
+function senkZamaniYaz(t){ depoYaz(AY_SENK, t); }
+
+var ustBilgi = {};
+function ustAl(id){
+  if(ustBilgi[id]) return Promise.resolve(ustBilgi[id]);
+  return istek(API + "/files/" + id + "?fields=id,name,parents")
+    .then(function(r){ ustBilgi[id] = { ad: r.name || "", ust: (r.parents || [])[0] || null }; return ustBilgi[id]; })
+    .catch(function(){ ustBilgi[id] = { ad: "", ust: null }; return ustBilgi[id]; });
+}
+
+/* Tek bir hastanın vizit/teknik/tanı yapısını Drive'dan yeniden okur. */
+function hastaTazele(p){
+  return hepsiniListele("'" + p.g + "' in parents and trashed = false", "id,name,mimeType")
+    .then(function(ic){
+      var tani = "";
+      ic.forEach(function(f){
+        if(f.mimeType !== KLASOR && f.name.indexOf("TANI - ") === 0) tani = f.name.slice(7).replace(/\.txt$/i, "");
+      });
+      var vk = ic.filter(function(f){ return f.mimeType === KLASOR; })
+                 .sort(function(a, b){ return a.name < b.name ? -1 : 1; });
+      var yeni = [], zincir = Promise.resolve();
+      vk.forEach(function(v){
+        zincir = zincir.then(function(){
+          return hepsiniListele("'" + v.id + "' in parents and trashed = false", "id,name,mimeType")
+            .then(function(ic2){
+              var tk = ic2.filter(function(f){ return f.mimeType === KLASOR; });
+              var sayilar = {}, alt = Promise.resolve();
+              tk.forEach(function(t){
+                alt = alt.then(function(){
+                  return hepsiniListele("'" + t.id + "' in parents and trashed = false", "id,mimeType")
+                    .then(function(ic3){
+                      sayilar[t.name] = { id: t.id, n: ic3.filter(function(f){ return f.mimeType !== KLASOR; }).length };
+                    }).catch(function(){ sayilar[t.name] = { id: t.id, n: 0 }; });
+                });
+              });
+              return alt.then(function(){ yeni.push({ t: v.name, id: v.id, k: sayilar }); });
+            }).catch(function(){});
+        });
+      });
+      return zincir.then(function(){ p.v = yeni; p.t = tani; });
+    });
+}
+
+/* Değişen bir klasörün hangi hastaya ait olduğunu bulur. */
+function sahipBul(id, haritalar){
+  var yol = [];
+  function adim(x, kalan){
+    if(!x || kalan <= 0 || x === kokId) return Promise.resolve(null);
+    if(haritalar.hasta[x]) return Promise.resolve({ p: haritalar.hasta[x] });
+    if(haritalar.alt[x])   return Promise.resolve({ p: haritalar.alt[x] });
+    if(DOKU_ID[x])         return Promise.resolve({ yeniDoku: DOKU_ID[x], klasor: yol[yol.length - 1] || null });
+    yol.push(x);
+    return ustAl(x).then(function(b){ return adim(b.ust, kalan - 1); });
+  }
+  return adim(id, 4);
+}
+
+function otoSenk(sessiz){
+  if(!jetonGecerli() && !jeton) return Promise.resolve(0);
+  var basla = senkZamani();
+  if(!basla){ senkZamaniYaz(new Date().toISOString().replace(/\.\d+Z$/, "Z")); return Promise.resolve(0); }
+  var simdi = new Date().toISOString().replace(/\.\d+Z$/, "Z");
+
+  var haritalar = { hasta: {}, alt: {} };
+  VERI.forEach(function(p){
+    if(p.g) haritalar.hasta[p.g] = p;
+    (p.v || []).forEach(function(v){
+      if(v.id) haritalar.alt[v.id] = p;
+      for(var k in v.k){ if(v.k[k].id) haritalar.alt[v.k[k].id] = p; }
+    });
+  });
+
+  if(!sessiz) durumYaz("Drive kontrol ediliyor…", "");
+  return hepsiniListele(
+      "modifiedTime > '" + basla + "' and mimeType != '" + KLASOR + "' and trashed = false",
+      "id,parents")
+    .then(function(dosyalar){
+      var ustler = {};
+      dosyalar.forEach(function(f){ var u = (f.parents || [])[0]; if(u) ustler[u] = 1; });
+      var idler = Object.keys(ustler);
+      if(!idler.length) return [];
+      var hastalar = [], yeniler = [], zincir = Promise.resolve();
+      idler.forEach(function(id){
+        zincir = zincir.then(function(){
+          return sahipBul(id, haritalar).then(function(r){
+            if(!r) return;
+            if(r.p){ if(hastalar.indexOf(r.p) < 0) hastalar.push(r.p); }
+            else if(r.yeniDoku && r.klasor && yeniler.indexOf(r.yeniDoku + "|" + r.klasor) < 0)
+              yeniler.push(r.yeniDoku + "|" + r.klasor);
+          });
+        });
+      });
+      return zincir.then(function(){
+        var ek = Promise.resolve();
+        yeniler.slice(0, 12).forEach(function(v){
+          var doku = v.slice(0, v.indexOf("|")), kid = v.slice(v.indexOf("|") + 1);
+          ek = ek.then(function(){
+            return ustAl(kid).then(function(b){
+              if(!b.ad) return;
+              var p = hastaBul(doku, b.ad);
+              if(!p){ p = { d: doku, h: b.ad, t: "", g: kid, v: [] }; VERI.push(p); }
+              else if(!p.g) p.g = kid;
+              if(hastalar.indexOf(p) < 0) hastalar.push(p);
+            });
+          });
+        });
+        return ek.then(function(){ return hastalar; });
+      });
+    })
+    .then(function(hastalar){
+      if(!hastalar.length){ senkZamaniYaz(simdi); if(!sessiz) durumYaz("Her şey güncel.", "iyi"); return 0; }
+      var sinir = hastalar.slice(0, 25), bitti = 0, zincir = Promise.resolve();
+      durumYaz("Drive'da " + hastalar.length + " hastada değişiklik var, okunuyor…", "");
+      sinir.forEach(function(p){
+        zincir = zincir.then(function(){
+          return hastaTazele(p).then(function(){ bitti++; }).catch(function(){});
+        });
+      });
+      return zincir.then(function(){
+        /* vizit kaydı kalmayan hasta listeden düşsün */
+        for(var i = VERI.length - 1; i >= 0; i--){ if(!VERI[i].v || !VERI[i].v.length) VERI.splice(i, 1); }
+        hazirla(); dizinKaydet(); cipleriKur(); ciz(); formCiz();
+        senkZamaniYaz(simdi);
+        durumYaz(bitti + " hasta güncellendi.", "iyi");
+        return bitti;
+      });
+    })
+    .catch(function(err){ if(!sessiz) durumYaz("Eşitleme yapılamadı: " + err.message, "kotu"); return 0; });
 }
 
 /* =========================================================
@@ -1018,13 +1157,17 @@ function olaylariBagla(){
   $("olustur").addEventListener("click", kayitOlustur);
   $("iptal").addEventListener("click", function(){ durduruldu = true; $("iptal").disabled = true; });
 
-  $("yenile").addEventListener("click", function(){
+  $("yenile").addEventListener("click", function(e){
     var b = $("yenile"); b.disabled = true;
-    durumYaz("Drive okunuyor…", "");
     galeriOnbellek = {};
-    dizinKur(function(m){ durumYaz(m, ""); })
-      .then(function(n){ cipleriKur(); ciz(); formCiz(); durumYaz(n + " hasta güncel.", "iyi"); })
-      .catch(function(err){ durumYaz(err.message, "kotu"); })
+    /* Normal tıklama: hızlı eşitleme. Shift ile tıklama: arşivi baştan oku. */
+    var tam = e.shiftKey;
+    var is = tam
+      ? (durumYaz("Arşivin tamamı okunuyor…", ""),
+         dizinKur(function(m){ durumYaz(m, ""); })
+           .then(function(n){ cipleriKur(); ciz(); formCiz(); durumYaz(n + " hasta güncel.", "iyi"); }))
+      : otoSenk(false);
+    is.catch(function(err){ durumYaz(err.message, "kotu"); })
       .then(function(){ b.disabled = false; });
   });
 
@@ -1040,7 +1183,7 @@ function olaylariBagla(){
 /* ---------------- açılış ---------------- */
 function kapakDurum(metin, sinif){
   var d = $("kapakdurum");
-  d.className = "banner " + (sinif || "info");
+  d.className = "serit " + (sinif || "bilgi");
   d.textContent = metin;
 }
 
@@ -1050,8 +1193,8 @@ function uygulamayiAc(){
   var z = dizinYukle();
   cipleriKur(); ciz(); formCiz();
   if(z){
-    var gun = Math.floor((Date.now() - z) / 86400000);
-    durumYaz("Kayıtlı liste açıldı" + (gun ? " (" + gun + " gün önce alınmış)" : "") + " — güncellemek için Yenile.", "");
+    durumYaz("Drive kontrol ediliyor…", "");
+    setTimeout(function(){ otoSenk(true); }, 400);
     return;
   }
   durumYaz("Arşiv ilk kez okunuyor…", "");
@@ -1074,10 +1217,10 @@ function baslat(){
 
   if(!clientId){
     $("kimlikalani").hidden = false;
-    kapakDurum("Başlamak için Google OAuth Client ID'ni gir.", "info");
+    kapakDurum("Başlamak için Google OAuth Client ID'ni gir.", "bilgi");
   } else {
     $("kimlikdegis").hidden = false;
-    kapakDurum("Google hesabınla bağlanman gerekiyor.", "info");
+    kapakDurum("Google hesabınla bağlanman gerekiyor.", "bilgi");
   }
 
   $("kimlikdegis").addEventListener("click", function(){
@@ -1090,23 +1233,32 @@ function baslat(){
     var girilen = $("cid").value.trim();
     if(!$("kimlikalani").hidden){
       if(!/apps\.googleusercontent\.com$/.test(girilen)){
-        kapakDurum("Client ID '…apps.googleusercontent.com' ile bitmeli.", "err"); return;
+        kapakDurum("Client ID '…apps.googleusercontent.com' ile bitmeli.", "kotu"); return;
       }
       clientId = girilen; depoYaz(AY_CID, clientId);
     }
-    if(!clientId){ kapakDurum("Önce Client ID gerekiyor.", "err"); return; }
-    if(!jetonKur()){ kapakDurum("Google kitaplığı yüklenemedi — sayfayı yenile.", "err"); return; }
-    kapakDurum("Google penceresi açılıyor…", "info");
+    if(!clientId){ kapakDurum("Önce Client ID gerekiyor.", "kotu"); return; }
+    if(!jetonKur()){ kapakDurum("Google kitaplığı yüklenemedi — sayfayı yenile.", "kotu"); return; }
+    kapakDurum("Google penceresi açılıyor…", "bilgi");
     jetonIste(false).then(function(){ uygulamayiAc(); })
-      .catch(function(err){ kapakDurum(err.message, "err"); });
+      .catch(function(err){ kapakDurum(err.message, "kotu"); });
   });
 
-  /* geçerli jeton varsa doğrudan gir */
-  if(clientId && jetonGecerli()){
+  /* Client ID varsa sessizce girmeyi dene — daha önce izin verilmişse
+     kullanıcıya hiç düğme göstermeden açılır. */
+  if(clientId){
     var sayac = 0;
     (function deneKur(){
-      if(jetonKur()){ uygulamayiAc(); return; }
-      if(sayac++ < 40) setTimeout(deneKur, 150);
+      if(jetonKur()){
+        if(jetonGecerli()){ uygulamayiAc(); return; }
+        kapakDurum("Google hesabına bağlanılıyor…", "bilgi");
+        jetonIste(true)
+          .then(function(){ uygulamayiAc(); })
+          .catch(function(){ kapakDurum("Devam etmek için Google hesabınla bağlan.", "bilgi"); });
+        return;
+      }
+      if(sayac++ < 60) setTimeout(deneKur, 150);
+      else kapakDurum("Google kitaplığı yüklenemedi — sayfayı yenile.", "kotu");
     })();
   }
 

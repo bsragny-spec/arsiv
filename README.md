@@ -52,8 +52,15 @@ tüm görüntüler ve tanılar kullanıcının kendi Google Drive'ında kalır.
 ## Nasıl çalışır
 
 - **Dizin**: Drive'daki tüm klasörler tek sorguda çekilir, ağaç tarayıcıda kurulur.
-  20 000 dosyalık arşiv için toplam birkaç istek yeter. Sonuç tarayıcıda saklanır;
-  **Yenile** düğmesi her şeyi Drive'dan yeniden okur.
+  20 000 dosyalık arşiv için toplam birkaç istek yeter. Sonuç tarayıcıda saklanır.
+- **Otomatik eşitleme**: uygulama her açılışta Drive'a "son bakıştan beri hangi
+  dosyalar değişti" diye tek sorgu sorar, değişen dosyaların sahibi hastaları
+  klasör zincirini yürüyerek bulur ve yalnızca onları yeniden okur. Hiçbir şey
+  değişmemişse tek istekle biter. Böylece bilgisayarda yapılan değişiklik
+  telefonda da görünür. **Yenile** aynı kontrolü elle yapar; **Shift+Yenile**
+  arşivin tamamını baştan okur.
+- **Sessiz giriş**: daha önce izin verildiyse uygulama açılırken Google'a
+  kendiliğinden bağlanır, düğmeye basmaya gerek kalmaz.
 - **Yükleme**: `uploadType=resumable` ile 8 MB'lık dilimler hâlinde. Ağ koparsa
   kaldığı bayttan devam eder. Boyut sınırı yoktur, dosya hiç dönüştürülmez.
 - **Önizleme**: Drive'ın kendi küçük resimleri kullanılır — HEIC gibi tarayıcının
