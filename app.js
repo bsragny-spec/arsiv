@@ -43,6 +43,10 @@ function buyukHarfBagla(inp, kosul){
 }
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
 function $(id){ return document.getElementById(id); }
+/* Doku adını CSS renk belirtecine çevirir: "OKULER MELANOSIS" -> var(--d-okuler-melanosis) */
+var DOKU_SLUG = { "KAPAK":"kapak","KONJONKTIVA":"konjonktiva","KOROID":"koroid","IRIS":"iris",
+                  "ORBIT":"orbit","RETINA":"retina","OKULER MELANOSIS":"okuler-melanosis" };
+function dokuRenk(d){ return "--d:var(--d-" + (DOKU_SLUG[nrm(d)] || "diger") + ")"; }
 function gunAy(t){
   if(!/^\d{8}$/.test(t)) return t;
   return t.slice(6,8) + "." + t.slice(4,6) + "." + t.slice(0,4);
@@ -381,51 +385,52 @@ function eslesenler(){
 function vizitHTML(p, v){
   var t = Object.keys(v.k).sort();
   return '<div class="vizit" data-vt="' + esc(v.t) + '">'
-    + '<div class="vbas"><div class="vtarih">' + esc(gunAy(v.t)) + '</div>'
+    + '<div class="vbas"><div class="vtarih sayi">' + esc(gunAy(v.t)) + '</div>'
     +   '<button class="x" type="button" data-silvizit="' + esc(v.t) + '" title="Bu viziti sil">✕</button></div>'
     + '<div class="teknikler">' + (t.length ? t.map(function(k){
-        return '<button class="teknik" type="button" data-galeri="' + esc(k) + '" data-vt="' + esc(v.t) + '"'
+        return '<button class="teknik" type="button" aria-expanded="false" data-galeri="' + esc(k) + '" data-vt="' + esc(v.t) + '"'
           + ' title="' + esc(TEKNIK_ACIK[k] || k) + ' — görüntüleri aç"><b>' + esc(k) + '</b>'
-          + '<i>' + (v.k[k].n || 0) + '</i>'
+          + '<i class="sayi">' + (v.k[k].n || 0) + '</i>'
           + '<span class="x" data-silteknik="' + esc(k) + '" data-vt="' + esc(v.t) + '" title="Klasörü sil">✕</span>'
           + '</button>';
-      }).join("") : '<span class="note">teknik klasörü yok</span>')
+      }).join("") : '<span class="not">teknik klasörü yok</span>')
     + '</div><div data-galerikutu></div></div>';
 }
 
 function ciz(){
   var liste = eslesenler();
-  sayimEl.textContent = liste.length === VERI.length
-    ? VERI.length + " hastanın tamamı listeleniyor"
-    : liste.length + " hasta bulundu";
+  sayimEl.innerHTML = liste.length === VERI.length
+    ? '<b class="sayi">' + VERI.length + '</b> hastanın tamamı listeleniyor'
+    : '<b class="sayi">' + liste.length + '</b> hasta bulundu';
   if(!liste.length){
-    sonucEl.innerHTML = '<div class="banner">Eşleşen hasta yok. Adın yazılışını ya da filtreleri değiştirmeyi dene.</div>';
+    sonucEl.innerHTML = '<div class="serit">Eşleşen hasta yok. Adın yazılışını ya da filtreleri değiştirmeyi dene.</div>';
     return;
   }
   sonucEl.innerHTML = liste.slice(0, 400).map(function(p){
     var id = p.d + "|" + p.h, ac = !!acik[id];
-    return '<article class="kart" data-id="' + esc(id) + '">'
+    return '<article class="kart' + (ac ? ' acik' : '') + '" data-id="' + esc(id) + '" style="' + dokuRenk(p.d) + '">'
       + '<button class="kbas" type="button" aria-expanded="' + ac + '">'
       +   '<span><span class="kad">' + esc(p.h) + '</span>'
-      +     '<span class="kmeta"><span class="doku">' + esc(p.d) + '</span>'
-      +       '<span>' + p.v.length + ' vizit</span><span>·</span><span>' + p._dosya + ' görüntü</span>'
-      +       (p.t ? '<span>·</span><span class="tani">' + esc(p.t) + '</span>'
-                   : '<span>·</span><span class="tani yok">tanı girilmemiş</span>')
+      +     '<span class="kmeta"><span class="doku-rozet">' + esc(p.d) + '</span>'
+      +       '<span class="sayi">' + p.v.length + ' vizit</span><span class="ayrac">·</span>'
+      +       '<span class="sayi">' + p._dosya + ' görüntü</span>'
+      +       (p.t ? '<span class="tani-rozet">' + esc(p.t) + '</span>'
+                   : '<span class="tani-yok">tanı girilmemiş</span>')
       +     '</span></span>'
-      +   '<span class="knum mono">' + (p.v.length ? gunAy(p.v[p.v.length - 1].t) : "—") + '</span>'
+      +   '<span class="knum sayi">' + (p.v.length ? gunAy(p.v[p.v.length - 1].t) : "—") + '</span>'
       + '</button>'
       + (ac ? '<div class="kgovde"><div class="tl">'
               + p.v.map(function(v){ return vizitHTML(p, v); }).join("")
               + '</div><div class="eylemler">'
-              + '<a class="btn btn-primary" href="https://drive.google.com/drive/folders/' + esc(p.g) + '" target="_blank" rel="noopener">Drive’da aç →</a>'
-              + '<button class="btn" data-vizitekle="1">Vizit ekle</button>'
-              + '<button class="btn" data-taniduzenle="1">' + (p.t ? "Tanıyı değiştir" : "Tanı ekle") + '</button>'
-              + '<button class="btn" data-adduzenle="1">Adı değiştir</button>'
+              + '<a class="dg dg-ana" href="https://drive.google.com/drive/folders/' + esc(p.g) + '" target="_blank" rel="noopener">Drive’da aç →</a>'
+              + '<button class="dg" data-vizitekle="1">Vizit ekle</button>'
+              + '<button class="dg" data-taniduzenle="1">' + (p.t ? "Tanıyı değiştir" : "Tanı ekle") + '</button>'
+              + '<button class="dg" data-adduzenle="1">Adı değiştir</button>'
               + '<button class="x" data-silhasta="1" title="Hastanın tamamını sil" style="margin-left:auto">✕</button>'
               + '</div><div class="durum" data-kdurum></div></div>'
             : "")
       + '</article>';
-  }).join("") + (liste.length > 400 ? '<p class="note">İlk 400 hasta gösteriliyor — aramayı daraltın.</p>' : "");
+  }).join("") + (liste.length > 400 ? '<p class="not" style="margin:12px 2px 0">İlk 400 hasta gösteriliyor — aramayı daraltın.</p>' : "");
 }
 
 function hastaBul(doku, ad){
@@ -481,13 +486,14 @@ function galeriAc(dugme, p, vt, tek){
   var vizitEl = dugme.closest(".vizit");
   var kutu = vizitEl.querySelector("[data-galerikutu]");
   var anahtar = p.g + "|" + vt + "|" + tek;
-  if(kutu.dataset.acik === anahtar){ kutu.innerHTML = ""; kutu.dataset.acik = ""; return; }
+  if(kutu.dataset.acik === anahtar){ kutu.innerHTML = ""; kutu.dataset.acik = ""; dugme.setAttribute("aria-expanded","false"); return; }
   kutu.dataset.acik = anahtar;
-  kutu.innerHTML = '<p class="note" style="margin:8px 0 0">' + esc(tek) + ' açılıyor…</p>';
+  dugme.setAttribute("aria-expanded","true");
+  kutu.innerHTML = '<p class="not" style="margin:10px 0 0">' + esc(tek) + ' açılıyor…</p>';
 
   var v = null;
   for(var i = 0; i < p.v.length; i++){ if(p.v[i].t === vt){ v = p.v[i]; break; } }
-  if(!v || !v.k[tek]){ kutu.innerHTML = '<p class="note">Klasör bulunamadı.</p>'; return; }
+  if(!v || !v.k[tek]){ kutu.innerHTML = '<p class="not">Klasör bulunamadı.</p>'; return; }
   var tid = v.k[tek].id;
 
   var hazir = galeriOnbellek[anahtar]
@@ -499,7 +505,7 @@ function galeriAc(dugme, p, vt, tek){
   hazir.then(function(dosyalar){
     if(kutu.dataset.acik !== anahtar) return;
     v.k[tek].n = dosyalar.length;
-    if(!dosyalar.length){ kutu.innerHTML = '<p class="note" style="margin:8px 0 0">Bu klasör boş.</p>'; return; }
+    if(!dosyalar.length){ kutu.innerHTML = '<p class="not" style="margin:10px 0 0">Bu klasör boş.</p>'; return; }
     kutu.innerHTML = '<div class="galeri">' + dosyalar.map(function(f, i){
       var kucuk = f.thumbnailLink ? f.thumbnailLink.replace(/=s\d+$/, "=s400") : "";
       return '<button class="kucuk" type="button" data-ac="' + i + '">'
@@ -508,14 +514,14 @@ function galeriAc(dugme, p, vt, tek){
             : '<span class="yok">' + esc(f.name) + '</span>')
         + '<span class="ad">' + esc(f.name) + '</span></button>';
     }).join("") + '</div>'
-    + '<p class="note" style="margin:8px 0 0">' + dosyalar.length + " dosya · "
-    + boyutYaz(dosyalar.reduce(function(a, f){ return a + (parseInt(f.size, 10) || 0); }, 0)) + "</p>";
+    + '<div class="galeri-alt"><span class="not sayi">' + dosyalar.length + " dosya · "
+    + boyutYaz(dosyalar.reduce(function(a, f){ return a + (parseInt(f.size, 10) || 0); }, 0)) + "</span></div>";
 
     kutu.querySelectorAll("[data-ac]").forEach(function(b){
       b.addEventListener("click", function(){ buyutecAc(dosyalar, parseInt(b.dataset.ac, 10), tek + " · " + gunAy(vt)); });
     });
   }).catch(function(err){
-    if(kutu.dataset.acik === anahtar) kutu.innerHTML = '<p class="durum err">' + esc(err.message) + '</p>';
+    if(kutu.dataset.acik === anahtar) kutu.innerHTML = '<p class="durum kotu" style="margin:10px 0 0">' + esc(err.message) + '</p>';
   });
 }
 
@@ -525,9 +531,9 @@ function buyutecAc(dosyalar, i, baslik){
   var kap = document.createElement("div");
   kap.className = "buyutec";
   kap.innerHTML =
-      '<div class="ust"><span data-bas></span><span class="sag">'
-    +   '<a class="btn mini" data-drive target="_blank" rel="noopener">Drive’da aç</a>'
-    +   '<button class="btn mini" data-kapat>Kapat ✕</button></span></div>'
+      '<div class="ust"><span class="baslik" data-bas></span><span class="sag">'
+    +   '<a class="dg dg-mini" data-drive target="_blank" rel="noopener">Drive’da aç</a>'
+    +   '<button class="dg dg-mini" data-kapat>Kapat ✕</button></span></div>'
     + '<button class="gez sol" data-gez="-1">‹</button>'
     + '<img data-gorsel alt="">'
     + '<button class="gez sag" data-gez="1">›</button>';
@@ -592,7 +598,7 @@ function onayIste(dugme, mesaj, eylem){
   yer.querySelector(".evet").addEventListener("click", function(e){
     e.stopPropagation();
     yer.textContent = "Siliniyor…";
-    eylem().then(function(m){ durumYaz(m || "Drive çöp kutusuna taşındı.", "ok"); })
+    eylem().then(function(m){ durumYaz(m || "Drive çöp kutusuna taşındı.", "iyi"); })
            .catch(function(err){ yer.textContent = err.message; setTimeout(kapat, 5000); });
   });
 }
@@ -639,7 +645,7 @@ function taniDuzenle(dugme, p){
   kutu.setAttribute("data-taniform", "1");
   kutu.style.cssText = "margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center";
   kutu.innerHTML = '<input type="text" style="flex:1;min-width:200px" value="' + esc(p.t || "") + '" placeholder="ör. UVEA MELANOM">'
-    + '<button class="btn btn-primary mini" data-kaydet>Kaydet</button>';
+    + '<button class="dg dg-ana dg-mini" data-kaydet>Kaydet</button>';
   dugme.closest(".eylemler").after(kutu);
   var inp = kutu.querySelector("input");
   buyukHarfBagla(inp);
@@ -657,9 +663,9 @@ function taniDuzenle(dugme, p){
       })
       .then(function(){
         p.t = metin; hazirla(); dizinKaydet(); cipleriKur(); ciz();
-        durumYaz(metin ? "Tanı kaydedildi." : "Tanı silindi.", "ok");
+        durumYaz(metin ? "Tanı kaydedildi." : "Tanı silindi.", "iyi");
       })
-      .catch(function(err){ kartDurum(dugme, err.message, "err"); });
+      .catch(function(err){ kartDurum(dugme, err.message, "kotu"); });
   });
 }
 
@@ -670,7 +676,7 @@ function adDuzenle(dugme, p){
   kutu.setAttribute("data-adform", "1");
   kutu.style.cssText = "margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center";
   kutu.innerHTML = '<input type="text" style="flex:1;min-width:200px" value="' + esc(p.h) + '">'
-    + '<button class="btn btn-primary mini" data-kaydet>Adı değiştir</button>';
+    + '<button class="dg dg-ana dg-mini" data-kaydet>Adı değiştir</button>';
   dugme.closest(".eylemler").after(kutu);
   var inp = kutu.querySelector("input");
   buyukHarfBagla(inp);
@@ -680,8 +686,8 @@ function adDuzenle(dugme, p){
     kartDurum(dugme, "Değiştiriliyor…", "");
     yenidenAdlandir(p.g, yeni).then(function(){
       p.h = yeni; hazirla(); dizinKaydet(); ciz();
-      durumYaz("Klasör adı değiştirildi.", "ok");
-    }).catch(function(err){ kartDurum(dugme, err.message, "err"); });
+      durumYaz("Klasör adı değiştirildi.", "iyi");
+    }).catch(function(err){ kartDurum(dugme, err.message, "kotu"); });
   });
 }
 
@@ -804,7 +810,7 @@ function vizitEkleBaslat(p){
   $("nad").value = p.h; $("nad").readOnly = true;
   var kk = $("kilitkutu");
   kk.hidden = false;
-  kk.innerHTML = '<div class="banner info">Var olan hastaya vizit ekleniyor: <b>' + esc(p.h) + '</b> · ' + esc(p.d)
+  kk.innerHTML = '<div class="serit bilgi">Var olan hastaya vizit ekleniyor: <b>' + esc(p.h) + '</b> · ' + esc(p.d)
     + ' <button class="lnk" id="kilitcoz" style="margin-left:8px">vazgeç</button></div>';
   $("kilitcoz").addEventListener("click", kilidiCoz);
   sekmeSec("yeni");
@@ -832,7 +838,7 @@ function kayitOlustur(){
   $("pfill").style.width = "0%";
 
   function satir(m, sinif){
-    cikti.insertAdjacentHTML("beforeend", '<div class="banner ' + (sinif || "") + '" style="margin-top:8px">' + esc(m) + "</div>");
+    cikti.insertAdjacentHTML("beforeend", '<div class="serit ' + (sinif || "") + '" style="margin-top:8px">' + esc(m) + "</div>");
   }
 
   var hastaKlasor = null, vizitKlasor = null, tekKlasor = {};
@@ -850,14 +856,14 @@ function kayitOlustur(){
       return z;
     })
     .then(function(){
-      satir("Klasörler hazır: " + KOK_AD + " / " + doku + " / " + ad + " / " + tk, "ok");
+      satir("Klasörler hazır: " + KOK_AD + " / " + doku + " / " + ad + " / " + tk, "iyi");
       if(!tani) return null;
       return hepsiniListele("'" + hastaKlasor.id + "' in parents and trashed = false", "id,name,mimeType")
         .then(function(l){
           var eskiler = l.filter(function(x){ return x.mimeType !== KLASOR && x.name.indexOf("TANI - ") === 0; });
           return metinDosyasi("TANI - " + dosyaAdiTemiz(tani) + ".txt", "TANI: " + tani + "\n", hastaKlasor.id)
             .then(function(){ return Promise.all(eskiler.map(function(x){ return copeAt(x.id).catch(function(){}); })); })
-            .then(function(){ satir("Tanı kaydedildi: " + tani, "ok"); });
+            .then(function(){ satir("Tanı kaydedildi: " + tani, "iyi"); });
         });
     })
     .then(function(){
@@ -902,8 +908,8 @@ function kayitOlustur(){
         if(atlandi) parca.push(atlandi + " zaten vardı");
         if(basarisiz.length) parca.push(basarisiz.length + " yüklenemedi");
         if(durduruldu) parca.push("durduruldu");
-        satir("Görüntüler · " + parca.join(", "), basarisiz.length ? "err" : "ok");
-        basarisiz.slice(0, 10).forEach(function(b){ satir(b.ad + " — " + b.mesaj, "err"); });
+        satir("Görüntüler · " + parca.join(", "), basarisiz.length ? "kotu" : "iyi");
+        basarisiz.slice(0, 10).forEach(function(b){ satir(b.ad + " — " + b.mesaj, "kotu"); });
       });
     })
     .then(function(){
@@ -923,14 +929,14 @@ function kayitOlustur(){
       });
       hazirla(); dizinKaydet(); cipleriKur(); ciz();
       cikti.insertAdjacentHTML("beforeend",
-        '<div class="banner ok" style="margin-top:10px">Kayıt hazır. '
+        '<div class="serit iyi" style="margin-top:10px">Kayıt hazır. '
         + '<a href="https://drive.google.com/drive/folders/' + esc(vizitKlasor.id) + '" target="_blank" rel="noopener">Vizit klasörünü Drive’da aç →</a></div>');
       secilenDosyalar = [];
       if(!kilitliHasta){ $("ntani").value = ""; }
       dosyaSatirlariCiz();
     })
     .catch(function(err){
-      satir("İşlem yarıda kaldı: " + err.message, "err");
+      satir("İşlem yarıda kaldı: " + err.message, "kotu");
     })
     .then(function(){
       $("olustur").disabled = false;
@@ -1017,8 +1023,8 @@ function olaylariBagla(){
     durumYaz("Drive okunuyor…", "");
     galeriOnbellek = {};
     dizinKur(function(m){ durumYaz(m, ""); })
-      .then(function(n){ cipleriKur(); ciz(); formCiz(); durumYaz(n + " hasta güncel.", "ok"); })
-      .catch(function(err){ durumYaz(err.message, "err"); })
+      .then(function(n){ cipleriKur(); ciz(); formCiz(); durumYaz(n + " hasta güncel.", "iyi"); })
+      .catch(function(err){ durumYaz(err.message, "kotu"); })
       .then(function(){ b.disabled = false; });
   });
 
@@ -1049,9 +1055,13 @@ function uygulamayiAc(){
     return;
   }
   durumYaz("Arşiv ilk kez okunuyor…", "");
+  sonucEl.innerHTML = '<div class="iskelet">'
+    + new Array(7).join("x").split("x").map(function(){ return '<div class="isk-satir"></div>'; }).join("")
+    + '</div>';
+  sayimEl.innerHTML = 'Drive okunuyor…';
   dizinKur(function(m){ durumYaz(m, ""); })
-    .then(function(n){ cipleriKur(); ciz(); formCiz(); durumYaz(n + " hasta yüklendi.", "ok"); })
-    .catch(function(err){ durumYaz(err.message, "err"); });
+    .then(function(n){ cipleriKur(); ciz(); formCiz(); durumYaz(n + " hasta yüklendi.", "iyi"); })
+    .catch(function(err){ durumYaz(err.message, "kotu"); });
 }
 
 function baslat(){
