@@ -17,8 +17,11 @@ self.addEventListener("fetch", function (e) {
   /* Google API ve kimlik istekleri asla önbelleğe alınmaz */
   if (u.origin !== self.location.origin) return;
   if (e.request.method !== "GET") return;
+  /* HTML her zaman tazeden alınır; app.js/config.js zaten sürüm damgalı. */
+  var kabukMu = e.request.mode === "navigate" || u.pathname.endsWith("/") ||
+                /\.(html|webmanifest)$/.test(u.pathname);
   e.respondWith(
-    fetch(e.request).then(function (y) {
+    fetch(e.request, kabukMu ? { cache: "reload" } : undefined).then(function (y) {
       var kopya = y.clone();
       caches.open(SURUM).then(function (c) { c.put(e.request, kopya); }).catch(function () {});
       return y;
