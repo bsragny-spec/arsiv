@@ -266,6 +266,9 @@ const T = (ad, k) => { console.log((k ? "  OK   " : "  HATA ") + ad); k ? gecti+
   const kucuk = new w.File([new Uint8Array(300 * 1024)], "kucuk.jpg", { type: "image/jpeg" });
   w.__arsivTestDosyaEkle ? w.__arsivTestDosyaEkle([buyuk, kucuk]) : null;
   /* dosya girdisini doğrudan besle */
+  const kutu = d.querySelector('[data-tbirak]');
+  T("teknik icin birakma kutusu olustu", !!kutu);
+  if (kutu) kutu.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
   const girdi = d.getElementById("ndosya");
   Object.defineProperty(girdi, "files", { value: [buyuk, kucuk], configurable: true });
   girdi.dispatchEvent(new w.Event("change", { bubbles: true }));

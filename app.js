@@ -850,6 +850,7 @@ function metinDosyasi(ad, icerik, ustId){
    8. YENİ KAYIT
    ========================================================= */
 var yeniDoku = null, yeniTek = {}, secilenDosyalar = [], kilitliHasta = null, durduruldu = false;
+var hedefTeknik = null;   /* hangi teknik kutusundan dosya seçiliyor */
 
 function tarihKodu(){
   var v = $("ntarih").value;
@@ -883,45 +884,87 @@ function formCiz(){
   yolCiz();
 }
 
-function dosyaSatirlariCiz(){
-  var kap = $("secilenler");
-  if(!secilenDosyalar.length){ kap.innerHTML = ""; return; }
+function dosyaBolumuCiz(){
+  var kap = $("dosyabolum");
   var tekler = seciliTeknikler();
-  /* Teknik seçilmeden dosya eklenmiş olabilir; seçim yapılır yapılmaz ata. */
-  secilenDosyalar.forEach(function(x){ if(tekler.indexOf(x.t) < 0) x.t = tekler[0] || ""; });
+
   if(!tekler.length){
-    kap.innerHTML = '<div class="serit uyari">' + secilenDosyalar.length
-      + ' dosya seçildi. Yüklenebilmesi için yukarıdan <b>en az bir teknik klasörü</b> seç '
-      + '(UWFP, OCT, ASP…). Seçer seçmez dosyalar oraya atanacak.</div>';
+    kap.innerHTML = '<div class="serit uyari">'
+      + (secilenDosyalar.length
+          ? '<b>' + secilenDosyalar.length + ' dosya seçili.</b> Nereye yükleneceğini belirlemek için '
+          : 'Görüntü ekleyebilmek için ')
+      + 'yukarıdan <b>en az bir teknik klasörü</b> seç (UWFP, OCT, ASP…). '
+      + 'Seçtiğin her klasör burada ayrı bir kutu olarak görünecek; görüntüleri doğrudan o kutuya sürükleyeceksin.</div>';
     return;
   }
-  kap.innerHTML = secilenDosyalar.map(function(x, i){
-    return '<div class="sdosya"><span class="ad">' + esc(x.f.name) + '</span>'
-      + '<span class="bo">' + boyutYaz(x.f.size) + '</span>'
-      + '<select data-tek="' + i + '" style="width:auto;padding:3px 6px;font-size:12px">'
-      +   (tekler.length ? tekler.map(function(t){
-            return '<option value="' + esc(t) + '"' + (x.t === t ? " selected" : "") + '>' + esc(t) + '</option>';
-          }).join("") : '<option value="">önce teknik seç</option>')
-      + '</select>'
-      + '<button class="x" data-cikar="' + i + '" title="Listeden çıkar">✕</button></div>';
+
+  /* Geçersiz tekniğe atanmış dosyaları ilk tekniğe çek */
+  secilenDosyalar.forEach(function(x){ if(tekler.indexOf(x.t) < 0) x.t = tekler[0]; });
+
+  kap.innerHTML = tekler.map(function(t){
+    var kendi = secilenDosyalar.filter(function(x){ return x.t === t; });
+    var bayt = kendi.reduce(function(a, x){ return a + x.f.size; }, 0);
+    return '<div class="tkutu" data-tkutu="' + esc(t) + '">'
+      + '<div class="tkutu-bas"><span class="ad">' + esc(t) + '</span>'
+      +   '<span class="acik">' + esc(TEKNIK_ACIK[t] || "") + '</span>'
+      +   '<span class="adet sayi">' + (kendi.length ? kendi.length + " dosya · " + boyutYaz(bayt) : "boş") + '</span>'
+      + '</div>'
+      + '<div class="tbirak" data-tbirak="' + esc(t) + '">'
+      +   'Görüntüleri buraya sürükle ya da <b>seçmek için tıkla</b>'
+      + '</div>'
+      + (kendi.length ? '<div class="tliste">' + kendi.map(function(x){
+            var i = secilenDosyalar.indexOf(x);
+            return '<div class="sdosya"><span class="ad">' + esc(x.f.name) + '</span>'
+              + '<span class="bo sayi">' + boyutYaz(x.f.size) + '</span>'
+              + (tekler.length > 1
+                  ? '<select data-tek="' + i + '" title="Başka klasöre taşı">'
+                    + tekler.map(function(o){
+                        return '<option value="' + esc(o) + '"' + (x.t === o ? " selected" : "") + '>' + esc(o) + '</option>';
+                      }).join("") + '</select>'
+                  : '')
+              + '<button class="x" data-cikar="' + i + '" title="Listeden çıkar">✕</button></div>';
+          }).join("") + '</div>' : "")
+      + '</div>';
   }).join("");
-  kap.querySelectorAll("[data-tek]").forEach(function(s){
-    s.addEventListener("change", function(){ secilenDosyalar[parseInt(s.dataset.tek, 10)].t = s.value; });
+
+  kap.querySelectorAll("[data-tek]").forEach(function(sec){
+    sec.addEventListener("change", function(){
+      secilenDosyalar[parseInt(sec.dataset.tek, 10)].t = sec.value;
+      dosyaBolumuCiz(); yolCiz();
+    });
   });
   kap.querySelectorAll("[data-cikar]").forEach(function(b){
     b.addEventListener("click", function(){
       secilenDosyalar.splice(parseInt(b.dataset.cikar, 10), 1);
-      dosyaSatirlariCiz(); yolCiz();
+      dosyaBolumuCiz(); yolCiz();
+    });
+  });
+  kap.querySelectorAll("[data-tbirak]").forEach(function(alan){
+    var kutu = alan.closest(".tkutu");
+    var t = alan.dataset.tbirak;
+    alan.addEventListener("click", function(){ hedefTeknik = t; $("ndosya").click(); });
+    ["dragenter", "dragover"].forEach(function(o){
+      kutu.addEventListener(o, function(e){ e.preventDefault(); kutu.classList.add("uzerinde"); });
+    });
+    ["dragleave", "drop"].forEach(function(o){
+      kutu.addEventListener(o, function(e){ e.preventDefault(); kutu.classList.remove("uzerinde"); });
+    });
+    kutu.addEventListener("drop", function(e){
+      if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length)
+        dosyaEkle(e.dataTransfer.files, t);
     });
   });
 }
+/* eski ad — çağrı yerleri bozulmasın */
+function dosyaSatirlariCiz(){ dosyaBolumuCiz(); }
 
-function dosyaEkle(dosyalar){
+function dosyaEkle(dosyalar, teknik){
   var tekler = seciliTeknikler();
+  var t = (teknik && tekler.indexOf(teknik) >= 0) ? teknik : (tekler[0] || "");
   Array.prototype.forEach.call(dosyalar, function(f){
-    secilenDosyalar.push({ f: f, t: tekler[0] || "" });
+    secilenDosyalar.push({ f: f, t: t });
   });
-  dosyaSatirlariCiz(); yolCiz();
+  dosyaBolumuCiz(); yolCiz();
 }
 
 function yolCiz(){
@@ -1149,16 +1192,11 @@ function olaylariBagla(){
   buyukHarfBagla($("nad"), function(){ return !kilitliHasta; });
   buyukHarfBagla($("ntani"));
 
-  var alan = $("dosyaalani"), girdi = $("ndosya");
-  alan.addEventListener("click", function(){ girdi.click(); });
-  girdi.addEventListener("change", function(){ dosyaEkle(girdi.files); girdi.value = ""; });
-  ["dragenter", "dragover"].forEach(function(o){
-    alan.addEventListener(o, function(e){ e.preventDefault(); alan.classList.add("uzerinde"); });
+  var girdi = $("ndosya");
+  girdi.addEventListener("change", function(){
+    dosyaEkle(girdi.files, hedefTeknik);
+    hedefTeknik = null; girdi.value = "";
   });
-  ["dragleave", "drop"].forEach(function(o){
-    alan.addEventListener(o, function(e){ e.preventDefault(); alan.classList.remove("uzerinde"); });
-  });
-  alan.addEventListener("drop", function(e){ if(e.dataTransfer && e.dataTransfer.files) dosyaEkle(e.dataTransfer.files); });
 
   $("olustur").addEventListener("click", kayitOlustur);
   $("iptal").addEventListener("click", function(){ durduruldu = true; $("iptal").disabled = true; });

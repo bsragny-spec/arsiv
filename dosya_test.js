@@ -30,38 +30,64 @@ function dosyaVer(adlar){
   d.getElementById('tab-yeni').click();
   await b(150);
 
-  console.log('--- teknik SECILMEDEN dosya ekle ---');
-  dosyaVer(['a.jpg','b.jpg']);
-  await b(120);
-  const uyari=d.querySelector('#secilenler .serit.uyari');
+  console.log('--- teknik SECILMEDEN ---');
+  const uyari=d.querySelector('#dosyabolum .serit.uyari');
   T('uyari gosterildi', !!uyari);
-  if(uyari) console.log('     ', uyari.textContent.replace(/\s+/g,' ').slice(0,95));
+  if(uyari) console.log('     ', uyari.textContent.replace(/\s+/g,' ').slice(0,110));
 
-  console.log('--- sonra teknik sec ---');
+  console.log('--- UWFP sec ---');
   const cip=[...d.querySelectorAll('#ntek .cip')].find(x=>x.textContent==='UWFP');
-  T('teknik cipleri cizildi', !!cip);
   cip.dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
   await b(150);
-  const satir=d.querySelectorAll('#secilenler .sdosya');
-  T('dosyalar listelendi', satir.length===2);
-  const sec=d.querySelector('#secilenler select');
-  T('teknige atandi (UWFP)', sec && sec.value==='UWFP');
-  console.log('     ', [...d.querySelectorAll('#secilenler .sdosya .ad')].map(x=>x.textContent).join(', '));
+  const kutular=d.querySelectorAll('.tkutu');
+  T('UWFP icin birakma kutusu olustu', kutular.length===1);
+  T('kutunun basligi UWFP', d.querySelector('.tkutu-bas .ad').textContent==='UWFP');
+  T('kutu bos yaziyor', /boş/.test(d.querySelector('.tkutu-bas .adet').textContent));
 
-  console.log('--- ikinci teknik + dosya dagitimi ---');
-  const cip2=[...d.querySelectorAll('#ntek .cip')].find(x=>x.textContent==='OCT');
-  cip2.dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
+  console.log('--- OCT de sec ---');
+  [...d.querySelectorAll('#ntek .cip')].find(x=>x.textContent==='OCT')
+    .dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
   await b(150);
-  const secler=d.querySelectorAll('#secilenler select');
-  T('her dosyada teknik secici var', secler.length===2);
-  T('secicide 2 secenek var', secler[0].options.length===2);
-  secler[1].value='OCT'; secler[1].dispatchEvent(new w.Event('change',{bubbles:true}));
-  await b(80);
-  T('ikinci dosya OCT oldu', d.querySelectorAll('#secilenler select')[1].value==='OCT');
+  T('iki kutu var', d.querySelectorAll('.tkutu').length===2);
+  console.log('     kutular:', [...d.querySelectorAll('.tkutu-bas .ad')].map(x=>x.textContent).join(', '));
 
-  console.log('--- eksik uyarisi ---');
-  const eksik=d.getElementById('eksik');
-  console.log('     ', eksik.hidden?'(gizli)':eksik.textContent);
+  console.log('--- OCT kutusuna dosya surukle ---');
+  const octKutu=[...d.querySelectorAll('.tkutu')].find(k=>k.dataset.tkutu==='OCT');
+  const dosyalar=['o1.e2e','o2.e2e'].map(a=>new w.File([new Uint8Array(2048)],a,{type:'application/octet-stream'}));
+  const ev=new w.Event('drop',{bubbles:true,cancelable:true});
+  Object.defineProperty(ev,'dataTransfer',{value:{files:dosyalar}});
+  octKutu.dispatchEvent(ev);
+  await b(150);
+  const oct2=[...d.querySelectorAll('.tkutu')].find(k=>k.dataset.tkutu==='OCT');
+  const uwf2=[...d.querySelectorAll('.tkutu')].find(k=>k.dataset.tkutu==='UWFP');
+  T('dosyalar OCT kutusuna dustu', oct2.querySelectorAll('.sdosya').length===2);
+  T('UWFP kutusu bos kaldi', uwf2.querySelectorAll('.sdosya').length===0);
+  console.log('     OCT:', oct2.querySelector('.adet').textContent);
+
+  console.log('--- UWFP kutusuna tiklayip dosya sec ---');
+  uwf2.querySelector('[data-tbirak]').dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
+  const gi=d.getElementById('ndosya');
+  Object.defineProperty(gi,'files',{value:[new w.File([new Uint8Array(500)],'u1.jpg',{type:'image/jpeg'})],configurable:true});
+  gi.dispatchEvent(new w.Event('change',{bubbles:true}));
+  await b(150);
+  const uwf3=[...d.querySelectorAll('.tkutu')].find(k=>k.dataset.tkutu==='UWFP');
+  T('UWFP kutusuna dustu', uwf3.querySelectorAll('.sdosya').length===1);
+  T('OCT bozulmadi', [...d.querySelectorAll('.tkutu')].find(k=>k.dataset.tkutu==='OCT').querySelectorAll('.sdosya').length===2);
+
+  console.log('--- dosyayi baska klasore tasi ---');
+  const sec=uwf3.querySelector('select');
+  T('tasima secicisi var', !!sec);
+  sec.value='OCT'; sec.dispatchEvent(new w.Event('change',{bubbles:true}));
+  await b(150);
+  T('UWFP bosaldi', [...d.querySelectorAll('.tkutu')].find(k=>k.dataset.tkutu==='UWFP').querySelectorAll('.sdosya').length===0);
+  T('OCT 3 dosya oldu', [...d.querySelectorAll('.tkutu')].find(k=>k.dataset.tkutu==='OCT').querySelectorAll('.sdosya').length===3);
+
+  console.log('--- dosya cikar ---');
+  [...d.querySelectorAll('.tkutu')].find(k=>k.dataset.tkutu==='OCT').querySelector('[data-cikar]')
+    .dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
+  await b(150);
+  T('2 dosya kaldi', [...d.querySelectorAll('.tkutu')].find(k=>k.dataset.tkutu==='OCT').querySelectorAll('.sdosya').length===2);
+
   console.log('\n'+g+' gecti, '+k+' kaldi');
   process.exit(k?1:0);
 })().catch(e=>{console.log('COKTU:',e&&e.stack);process.exit(1);});

@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0E5E63" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0E1113" media="(prefers-color-scheme: dark)">
 <title>Oküler Onkoloji Arşivi</title>
-<link rel="manifest" href="manifest.webmanifest?v=202609171338">
+<link rel="manifest" href="manifest.webmanifest?v=202609171356">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -390,6 +390,28 @@ main{max-width:1120px;margin:0 auto;padding:22px 22px calc(56px + env(safe-area-
 .dosya-alani:hover{border-color:var(--vurgu-cizgi);color:var(--murekkep-2)}
 .dosya-alani.uzerinde{border-color:var(--vurgu);background:var(--vurgu-yumusak);color:var(--vurgu)}
 .dosya-alani b{color:var(--murekkep-2);font-weight:600}
+.tkutu{
+  border:1px solid var(--cizgi);border-radius:var(--yuvarlak);overflow:hidden;
+  background:var(--yuzey);transition:border-color .14s,box-shadow .14s;
+}
+.tkutu + .tkutu{margin-top:10px}
+.tkutu-bas{
+  display:flex;align-items:center;gap:9px;padding:9px 12px;
+  background:var(--yuzey-2);border-bottom:1px solid var(--cizgi-ince);
+}
+.tkutu-bas .ad{font-size:12px;font-weight:650;letter-spacing:.05em;color:var(--murekkep-2)}
+.tkutu-bas .acik{font-size:11.5px;color:var(--cok-soluk);font-weight:400;letter-spacing:0}
+.tkutu-bas .adet{margin-left:auto;font-size:11px;font-weight:600;color:var(--soluk);
+  background:var(--yuzey-3);border-radius:5px;padding:2px 7px}
+.tbirak{
+  padding:18px 14px;text-align:center;cursor:pointer;color:var(--soluk);font-size:13px;
+  transition:background .14s,color .14s;
+}
+.tbirak b{color:var(--murekkep-2);font-weight:600}
+.tbirak:hover{background:var(--yuzey-2);color:var(--murekkep-2)}
+.tkutu.uzerinde{border-color:var(--vurgu);box-shadow:0 0 0 3px color-mix(in srgb,var(--vurgu) 14%,transparent)}
+.tkutu.uzerinde .tbirak{background:var(--vurgu-yumusak);color:var(--vurgu)}
+.tliste{display:flex;flex-direction:column;gap:6px;padding:0 10px 11px}
 .secilenler{display:flex;flex-direction:column;gap:6px;margin-top:12px}
 .sdosya{
   display:flex;align-items:center;gap:10px;font-size:12.5px;padding:7px 9px;
@@ -529,12 +551,8 @@ main{max-width:1120px;margin:0 auto;padding:22px 22px calc(56px + env(safe-area-
 
       <div class="bolum">
         <h3>Görüntüler</h3>
-        <div class="dosya-alani" id="dosyaalani">
-          Dosyaları buraya sürükle ya da <b>seçmek için tıkla</b><br>
-          <span class="not">Her dosya türü kabul edilir · boyut sınırı yok · tam kalitede yüklenir</span>
-        </div>
+        <div id="dosyabolum"></div>
         <input id="ndosya" type="file" multiple hidden>
-        <div class="secilenler" id="secilenler"></div>
       </div>
 
       <div class="bolum">
@@ -561,7 +579,7 @@ main{max-width:1120px;margin:0 auto;padding:22px 22px calc(56px + env(safe-area-
 </div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="config.js?v=202609171338"></script>
-<script src="app.js?v=202609171338"></script>
+<script src="config.js?v=202609171356"></script>
+<script src="app.js?v=202609171356"></script>
 </body>
 </html>
