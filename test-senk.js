@@ -43,8 +43,8 @@ function oturum(depo) {
   const js = fs.readFileSync(path.join(__dirname, "app.js"), "utf8");
   const sayfa = html
     .replace('<script src="https://accounts.google.com/gsi/client" async defer></script>', "")
-    .replace('<script src="config.js"></script>', "")
-    .replace('<script src="app.js"></script>', "<script>" + js + "</script>");
+    .replace(/<script src="config\.js[^"]*"><\/script>/, "")
+    .replace(/<script src="app\.js[^"]*"><\/script>/, "<script>" + js + "</script>");
   const dom = new JSDOM(sayfa, {
     runScripts: "dangerously", pretendToBeVisual: true, url: "https://o.github.io/arsiv/",
     beforeParse(w) {

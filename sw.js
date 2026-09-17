@@ -1,6 +1,6 @@
 /* Basit kabuk önbelleği — uygulama çevrimdışı açılır, veriler Drive'dan gelir. */
-var SURUM = "arsiv-202609142115";
-var KABUK = ["./", "./index.html", "./app.js?v=202609142115", "./config.js?v=202609142115"];
+var SURUM = "arsiv-202609171338";
+var KABUK = ["./", "./index.html", "./app.js?v=202609171338", "./config.js?v=202609171338"];
 
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(SURUM).then(function (c) { return c.addAll(KABUK); }).then(function () { return self.skipWaiting(); }));

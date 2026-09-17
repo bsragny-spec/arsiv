@@ -887,6 +887,14 @@ function dosyaSatirlariCiz(){
   var kap = $("secilenler");
   if(!secilenDosyalar.length){ kap.innerHTML = ""; return; }
   var tekler = seciliTeknikler();
+  /* Teknik seçilmeden dosya eklenmiş olabilir; seçim yapılır yapılmaz ata. */
+  secilenDosyalar.forEach(function(x){ if(tekler.indexOf(x.t) < 0) x.t = tekler[0] || ""; });
+  if(!tekler.length){
+    kap.innerHTML = '<div class="serit uyari">' + secilenDosyalar.length
+      + ' dosya seçildi. Yüklenebilmesi için yukarıdan <b>en az bir teknik klasörü</b> seç '
+      + '(UWFP, OCT, ASP…). Seçer seçmez dosyalar oraya atanacak.</div>';
+    return;
+  }
   kap.innerHTML = secilenDosyalar.map(function(x, i){
     return '<div class="sdosya"><span class="ad">' + esc(x.f.name) + '</span>'
       + '<span class="bo">' + boyutYaz(x.f.size) + '</span>'
@@ -906,8 +914,6 @@ function dosyaSatirlariCiz(){
       dosyaSatirlariCiz(); yolCiz();
     });
   });
-  /* teknik seçimi değişmişse varsayılanı güncelle */
-  secilenDosyalar.forEach(function(x){ if(tekler.indexOf(x.t) < 0) x.t = tekler[0] || ""; });
 }
 
 function dosyaEkle(dosyalar){
@@ -924,7 +930,7 @@ function yolCiz(){
   if(!yeniDoku) eksikler.push("doku");
   if(ad.length < 3) eksikler.push("hasta adı");
   if(!tk) eksikler.push("vizit tarihi");
-  if(!tekler.length) eksikler.push("en az bir teknik");
+  if(!tekler.length) eksikler.push("en az bir teknik" + (secilenDosyalar.length ? " (seçtiğin dosyalar bunun altına yüklenecek)" : ""));
   var e = $("eksik");
   if(eksikler.length){
     e.hidden = false;
@@ -1252,9 +1258,16 @@ function baslat(){
       if(jetonKur()){
         if(jetonGecerli()){ uygulamayiAc(); return; }
         kapakDurum("Google hesabına bağlanılıyor…", "bilgi");
+        var bitti = false;
+        var zamanAsimi = setTimeout(function(){
+          if(!bitti){ bitti = true; kapakDurum("Devam etmek için Google hesabınla bağlan.", "bilgi"); }
+        }, 7000);
         jetonIste(true)
-          .then(function(){ uygulamayiAc(); })
-          .catch(function(){ kapakDurum("Devam etmek için Google hesabınla bağlan.", "bilgi"); });
+          .then(function(){ if(!bitti){ bitti = true; clearTimeout(zamanAsimi); uygulamayiAc(); } })
+          .catch(function(){
+            if(!bitti){ bitti = true; clearTimeout(zamanAsimi);
+              kapakDurum("Devam etmek için Google hesabınla bağlan.", "bilgi"); }
+          });
         return;
       }
       if(sayac++ < 60) setTimeout(deneKur, 150);

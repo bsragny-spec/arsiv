@@ -59,7 +59,8 @@ function kur() {
   const html = fs.readFileSync(path.join(DIZIN, "index.html"), "utf8");
   const js = fs.readFileSync(path.join(DIZIN, "app.js"), "utf8");
   const sayfa = html.replace('<script src="https://accounts.google.com/gsi/client" async defer></script>', "")
-                    .replace('<script src="app.js"></script>', "<script>" + js + "</script>");
+                    .replace(/<script src="config\.js[^"]*"><\/script>/, "")
+                    .replace(/<script src="app\.js[^"]*"><\/script>/, "<script>" + js + "</script>");
 
   const dom = new JSDOM(sayfa, {
     runScripts: "dangerously", pretendToBeVisual: true, url: "https://ornek.github.io/arsiv/",
