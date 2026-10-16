@@ -46,7 +46,8 @@ function sorgula(d, q) {
   if ((m = /name = '([^']*)'/.exec(q))) liste = liste.filter(f => f.name === m[1].replace(/\\'/g, "'"));
   if ((m = /mimeType = '([^']*)'/.exec(q))) liste = liste.filter(f => f.mimeType === m[1]);
   if ((m = /mimeType != '([^']*)'/.exec(q))) liste = liste.filter(f => f.mimeType !== m[1]);
-  if ((m = /'([^']*)' in parents/.exec(q))) liste = liste.filter(f => (f.parents || []).includes(m[1]));
+  { const eb = [...q.matchAll(/'([^']*)' in parents/g)].map(x => x[1]);
+    if (eb.length) liste = liste.filter(f => (f.parents || []).some(u => eb.includes(u))); }
   return liste;
 }
 

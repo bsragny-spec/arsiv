@@ -25,6 +25,7 @@ var AY_CID   = "arsiv-client-id";
 var AY_DIZIN = "arsiv-dizin-v1";
 var AY_KOK   = "arsiv-kok-id";
 var AY_SENK  = "arsiv-son-senk";
+var AY_SENK_GOR = "arsiv-senk-gorulen";   /* örtüşme payında zaten işlenmiş öğeler: id -> modifiedTime */
 
 /* ---------------- küçük yardımcılar ---------------- */
 var TRMAP = {"Ç":"C","ç":"C","Ğ":"G","ğ":"G","İ":"I","ı":"I","Ö":"O","ö":"O","Ş":"S","ş":"S","Ü":"U","ü":"U"};
@@ -358,22 +359,37 @@ function kokBul(){
 }
 
 /* ---------- otomatik eşitleme ----------
-   Arşivin tamamını yeniden okumak binlerce istek demek. Onun yerine Drive'a
-   "son bakıştan beri hangi dosyalar değişti" diye tek sorgu sorulur; değişen
-   dosyaların hangi hastaya ait olduğu klasör zinciri yürünerek bulunur ve
-   yalnızca o hastalar yeniden okunur. Hiçbir şey değişmemişse tek istek. */
+   Her açılışta ve her Yenile'de iki şey yapılır:
+   1) Hasta listesi denetimi: Drive'daki bütün hasta klasörleri tek sorguda
+      çekilir, tarayıcıdaki listeyle karşılaştırılır. Başka cihazda açılan,
+      silinen ya da adı değişen hasta, kaç tane olursa olsun yakalanır.
+   2) Son bakıştan beri değişen dosya ve klasörler tek sorguda çekilir; hangi
+      hastaya ait oldukları bilinen klasörlerden bulunur, yalnızca o hastalar
+      yeniden okunur.
+   Okunamayan hasta listeden düşmez; eski bilgisi kalır ve bir sonraki
+   Yenile'de tekrar denenir. Hiçbir şey değişmemişse üç istekte biter. */
+var SENK_PAYI = 5 * 60 * 1000;   /* cihaz saati Google'dan birkaç dakika sapsa da değişiklik kaçmasın */
+var senkSuruyor = null, senkSesli = false;
+
 function senkZamani(){ return depoOku(AY_SENK, null); }
 function senkZamaniYaz(t){ depoYaz(AY_SENK, t); }
+function zamanDamgasi(ms){ return new Date(ms).toISOString().replace(/\.\d+Z$/, "Z"); }
 
-var ustBilgi = {};
-function ustAl(id){
-  if(ustBilgi[id]) return Promise.resolve(ustBilgi[id]);
-  return istek(API + "/files/" + id + "?fields=id,name,parents")
-    .then(function(r){ ustBilgi[id] = { ad: r.name || "", ust: (r.parents || [])[0] || null }; return ustBilgi[id]; })
-    .catch(function(){ ustBilgi[id] = { ad: "", ust: null }; return ustBilgi[id]; });
+/* Aynı anda en fazla `es` iş yürütür. */
+function sinirliParalel(liste, es, fn){
+  var i = 0;
+  function isci(){
+    if(i >= liste.length) return Promise.resolve();
+    var x = liste[i++];
+    return Promise.resolve().then(function(){ return fn(x); }).then(isci, isci);
+  }
+  var isciler = [];
+  for(var k = 0; k < Math.min(es, liste.length); k++) isciler.push(isci());
+  return Promise.all(isciler);
 }
 
-/* Tek bir hastanın vizit/teknik/tanı yapısını Drive'dan yeniden okur. */
+/* Tek bir hastanın vizit/teknik/tanı yapısını Drive'dan yeniden okur.
+   Herhangi bir adım başarısız olursa hastanın eski bilgisi olduğu gibi kalır. */
 function hastaTazele(p){
   return hepsiniListele("'" + p.g + "' in parents and trashed = false", "id,name,mimeType")
     .then(function(ic){
@@ -395,102 +411,180 @@ function hastaTazele(p){
                   return hepsiniListele("'" + t.id + "' in parents and trashed = false", "id,mimeType")
                     .then(function(ic3){
                       sayilar[t.name] = { id: t.id, n: ic3.filter(function(f){ return f.mimeType !== KLASOR; }).length };
-                    }).catch(function(){ sayilar[t.name] = { id: t.id, n: 0 }; });
+                    });
                 });
               });
               return alt.then(function(){ yeni.push({ t: v.name, id: v.id, k: sayilar }); });
-            }).catch(function(){});
+            });
         });
       });
-      return zincir.then(function(){ p.v = yeni; p.t = tani; });
+      return zincir.then(function(){ p.v = yeni; p.t = tani; delete p.o; });
     });
 }
 
-/* Değişen bir klasörün hangi hastaya ait olduğunu bulur. */
-function sahipBul(id, haritalar){
-  var yol = [];
-  function adim(x, kalan){
-    if(!x || kalan <= 0 || x === kokId) return Promise.resolve(null);
-    if(haritalar.hasta[x]) return Promise.resolve({ p: haritalar.hasta[x] });
-    if(haritalar.alt[x])   return Promise.resolve({ p: haritalar.alt[x] });
-    if(DOKU_ID[x])         return Promise.resolve({ yeniDoku: DOKU_ID[x], klasor: yol[yol.length - 1] || null });
-    yol.push(x);
-    return ustAl(x).then(function(b){ return adim(b.ust, kalan - 1); });
-  }
-  return adim(id, 4);
+/* Kök altındaki doku klasörleri (yeni açılan ya da adı değişen doku da yakalanır). */
+function dokulariOku(){
+  return kokBul().then(function(rid){
+    return hepsiniListele("'" + rid + "' in parents and mimeType = '" + KLASOR + "' and trashed = false", "id,name");
+  }).then(function(l){
+    var d = {};
+    l.forEach(function(f){ if(f.name.charAt(0) !== "_") d[f.id] = f.name; });
+    if(Object.keys(d).length) DOKU_ID = d;
+    return DOKU_ID;
+  });
+}
+
+/* Drive'daki hasta klasörlerini tarayıcıdaki listeyle karşılaştırır. */
+function kadroDenetle(){
+  return dokulariOku().then(function(){
+    var idler = Object.keys(DOKU_ID);
+    if(!idler.length) return [];
+    var q = "mimeType = '" + KLASOR + "' and trashed = false and ("
+          + idler.map(function(id){ return "'" + id + "' in parents"; }).join(" or ") + ")";
+    return hepsiniListele(q, "id,name,parents");
+  }).then(function(klasorler){
+    var drive = {}, adla = {};
+    klasorler.forEach(function(f){
+      var u = (f.parents || []).filter(function(x){ return DOKU_ID[x]; })[0];
+      if(!u) return;
+      drive[f.id] = { ad: f.name, doku: DOKU_ID[u] };
+      adla[DOKU_ID[u] + "|" + nrm(f.name)] = f.id;
+    });
+    var sonuc = { yeni: [], silinen: [], degisen: 0, toplam: Object.keys(drive).length, tamTarama: false };
+    if(!sonuc.toplam) return sonuc;                 /* boş yanıtla liste asla silinmez */
+
+    /* Önce ne silineceğini hesapla; olağandışı çoksa listeye dokunma, baştan oku. */
+    var silinecek = VERI.filter(function(p){
+      var g = p.g || adla[p.d + "|" + nrm(p.h)];
+      return !g || !drive[g];
+    });
+    if(silinecek.length > Math.max(25, VERI.length * 0.1)){ sonuc.tamTarama = true; return sonuc; }
+
+    var gorulen = {};
+    for(var i = VERI.length - 1; i >= 0; i--){
+      var p = VERI[i];
+      if(!p.g) p.g = adla[p.d + "|" + nrm(p.h)] || "";
+      var dh = p.g ? drive[p.g] : null;
+      if(!dh || gorulen[p.g]){
+        if(!dh) sonuc.silinen.push(p.h);
+        delete acik[p.d + "|" + p.h];
+        VERI.splice(i, 1);
+        continue;
+      }
+      gorulen[p.g] = 1;
+      if(dh.ad !== p.h || dh.doku !== p.d){ p.h = dh.ad; p.d = dh.doku; sonuc.degisen++; }
+    }
+    Object.keys(drive).forEach(function(id){
+      if(gorulen[id]) return;
+      var p = { d: drive[id].doku, h: drive[id].ad, t: "", g: id, v: [], o: 1 };   /* o: henüz okunmadı */
+      VERI.push(p); sonuc.yeni.push(p);
+    });
+    return sonuc;
+  });
 }
 
 function otoSenk(sessiz){
   if(!jetonGecerli() && !jeton) return Promise.resolve(0);
+  if(!sessiz) senkSesli = true;            /* sessiz eşitleme sürerken Yenile'ye basılırsa sonucu göster */
+  if(senkSuruyor) return senkSuruyor;
   var basla = senkZamani();
-  if(!basla){ senkZamaniYaz(new Date().toISOString().replace(/\.\d+Z$/, "Z")); return Promise.resolve(0); }
-  var simdi = new Date().toISOString().replace(/\.\d+Z$/, "Z");
+  var simdi = zamanDamgasi(Date.now());
+  if(senkSesli) durumYaz("Drive ile karşılaştırılıyor…", "");
 
-  var haritalar = { hasta: {}, alt: {} };
-  VERI.forEach(function(p){
-    if(p.g) haritalar.hasta[p.g] = p;
-    (p.v || []).forEach(function(v){
-      if(v.id) haritalar.alt[v.id] = p;
-      for(var k in v.k){ if(v.k[k].id) haritalar.alt[v.k[k].id] = p; }
-    });
-  });
-
-  if(!sessiz) durumYaz("Drive kontrol ediliyor…", "");
-  return hepsiniListele(
-      "modifiedTime > '" + basla + "' and mimeType != '" + KLASOR + "' and trashed = false",
-      "id,parents")
-    .then(function(dosyalar){
-      var ustler = {};
-      dosyalar.forEach(function(f){ var u = (f.parents || [])[0]; if(u) ustler[u] = 1; });
-      var idler = Object.keys(ustler);
-      if(!idler.length) return [];
-      var hastalar = [], yeniler = [], zincir = Promise.resolve();
-      idler.forEach(function(id){
-        zincir = zincir.then(function(){
-          return sahipBul(id, haritalar).then(function(r){
-            if(!r) return;
-            if(r.p){ if(hastalar.indexOf(r.p) < 0) hastalar.push(r.p); }
-            else if(r.yeniDoku && r.klasor && yeniler.indexOf(r.yeniDoku + "|" + r.klasor) < 0)
-              yeniler.push(r.yeniDoku + "|" + r.klasor);
-          });
-        });
-      });
-      return zincir.then(function(){
-        var ek = Promise.resolve();
-        yeniler.slice(0, 12).forEach(function(v){
-          var doku = v.slice(0, v.indexOf("|")), kid = v.slice(v.indexOf("|") + 1);
-          ek = ek.then(function(){
-            return ustAl(kid).then(function(b){
-              if(!b.ad) return;
-              var p = hastaBul(doku, b.ad);
-              if(!p){ p = { d: doku, h: b.ad, t: "", g: kid, v: [] }; VERI.push(p); }
-              else if(!p.g) p.g = kid;
-              if(hastalar.indexOf(p) < 0) hastalar.push(p);
-            });
-          });
-        });
-        return ek.then(function(){ return hastalar; });
-      });
+  var kadro = null, okunacak = [], tazelenen = 0, okunamayan = 0, yeniGorulen = null;
+  senkSuruyor = kadroDenetle()
+    .then(function(k){
+      kadro = k;
+      if(k.tamTarama || !basla) return [];
+      return hepsiniListele("modifiedTime > '" + zamanDamgasi(Date.parse(basla) - SENK_PAYI) + "'", "id,parents,modifiedTime");
     })
-    .then(function(hastalar){
-      if(!hastalar.length){ senkZamaniYaz(simdi); if(!sessiz) durumYaz("Her şey güncel.", "iyi"); return 0; }
-      var sinir = hastalar.slice(0, 25), bitti = 0, zincir = Promise.resolve();
-      durumYaz("Drive'da " + hastalar.length + " hastada değişiklik var, okunuyor…", "");
-      sinir.forEach(function(p){
-        zincir = zincir.then(function(){
-          return hastaTazele(p).then(function(){ bitti++; }).catch(function(){});
+    .then(function(hepsi){
+      /* örtüşme payında önceki eşitlemenin zaten işlediği, o günden beri değişmemiş öğeler atlanır */
+      var once = depoOku(AY_SENK_GOR, {}) || {};
+      var esik = Date.parse(simdi) - SENK_PAYI;
+      yeniGorulen = {};
+      hepsi.forEach(function(f){ if(f.modifiedTime && Date.parse(f.modifiedTime) >= esik) yeniGorulen[f.id] = f.modifiedTime; });
+      var degisenler = hepsi.filter(function(f){ return !f.modifiedTime || once[f.id] !== f.modifiedTime; });
+      if(kadro.tamTarama){
+        durumYaz("Liste Drive'dan çok farklı, arşiv baştan okunuyor…", "");
+        return dizinKur(function(m){ durumYaz(m, ""); }).then(function(n){
+          cipleriKur(); ciz(); formCiz();
+          durumYaz(n + " hasta · arşiv Drive'dan baştan okundu.", "iyi");
+          return "bitti";
+        });
+      }
+
+      /* Bilinen klasör → hasta haritası (yeni eklenen hastalar dahil). */
+      var hasta = {}, alt = {};
+      VERI.forEach(function(p){
+        if(p.g) hasta[p.g] = p;
+        (p.v || []).forEach(function(v){
+          if(v.id) alt[v.id] = p;
+          for(var k in v.k){ if(v.k[k].id) alt[v.k[k].id] = p; }
         });
       });
-      return zincir.then(function(){
-        /* vizit kaydı kalmayan hasta listeden düşsün */
-        for(var i = VERI.length - 1; i >= 0; i--){ if(!VERI[i].v || !VERI[i].v.length) VERI.splice(i, 1); }
-        hazirla(); dizinKaydet(); cipleriKur(); ciz(); formCiz();
+      /* Değişen öğeden yukarı doğru yürü: bilinen bir klasöre varırsa o hastanındır.
+         Yeni açılan vizit/teknik klasörleri de değişenler arasında olduğundan
+         zincir ağa hiç sormadan kurulur; arşiv dışındaki dosyalar sessizce atlanır. */
+      var ust = {};
+      hepsi.forEach(function(f){ ust[f.id] = (f.parents || [])[0] || null; });
+      function sahibi(id){
+        for(var adim = 0, x = id; adim < 6 && x; adim++){
+          if(hasta[x]) return hasta[x];
+          if(alt[x]) return alt[x];
+          if(!(x in ust)) return null;
+          x = ust[x];
+        }
+        return null;
+      }
+      VERI.forEach(function(p){ if(p.o) okunacak.push(p); });   /* hiç okunamamış hastalar */
+      degisenler.forEach(function(f){
+        var p = sahibi(f.id);
+        if(p && okunacak.indexOf(p) < 0) okunacak.push(p);
+      });
+      if(!okunacak.length) return "";
+      if(okunacak.length > 2 || senkSesli) durumYaz("Drive'dan okunuyor… 0/" + okunacak.length, "");
+      return sinirliParalel(okunacak, 4, function(p){
+        return hastaTazele(p).then(function(){ tazelenen++; }, function(){ okunamayan++; })
+          .then(function(){
+            if(okunacak.length > 2 || senkSesli)
+              durumYaz("Drive'dan okunuyor… " + (tazelenen + okunamayan) + "/" + okunacak.length, "");
+          });
+      }).then(function(){ return ""; });
+    })
+    .then(function(r){
+      if(r === "bitti") return VERI.length;
+      var degisti = kadro.yeni.length || kadro.silinen.length || kadro.degisen || tazelenen;
+      if(degisti){ hazirla(); dizinKaydet(); cipleriKur(); ciz(); formCiz(); }
+      if(!okunamayan){                        /* okunamayan varsa zaman ilerlemez: sonraki Yenile tekrar dener */
         senkZamaniYaz(simdi);
-        durumYaz(bitti + " hasta güncellendi.", "iyi");
-        return bitti;
-      });
+        if(yeniGorulen) depoYaz(AY_SENK_GOR, yeniGorulen);
+      }
+
+      var yeniOkunan = kadro.yeni.filter(function(p){ return !p.o; }).length;
+      var parca = [];
+      if(kadro.yeni.length) parca.push(kadro.yeni.length + " yeni hasta eklendi");
+      if(kadro.silinen.length) parca.push(kadro.silinen.length + " hasta Drive'da yok, listeden çıktı");
+      var guncellenen = tazelenen - yeniOkunan;
+      if(guncellenen > 0) parca.push(guncellenen + " hastanın kaydı güncellendi");
+      if(okunamayan) parca.push(okunamayan + " hasta okunamadı, Yenile'ye tekrar bas");
+      if(parca.length){
+        durumYaz(parca.join(" · ") + " · toplam " + VERI.length + " hasta.", okunamayan ? "kotu" : "iyi");
+      } else if(senkSesli){
+        durumYaz("Drive ile karşılaştırıldı: " + VERI.length + " hasta, hepsi güncel.", "iyi");
+      }
+      return tazelenen;
     })
-    .catch(function(err){ if(!sessiz) durumYaz("Eşitleme yapılamadı: " + err.message, "kotu"); return 0; });
+    .catch(function(err){
+      /* liste denetimi yapıldıysa onu kaybetme; okunmamış hastalar sonraki eşitlemede okunur */
+      if(kadro && (kadro.yeni.length || kadro.silinen.length || kadro.degisen)){
+        hazirla(); dizinKaydet(); cipleriKur(); ciz(); formCiz();
+      }
+      if(senkSesli) durumYaz("Eşitleme yapılamadı: " + err.message, "kotu");
+      return 0;
+    })
+    .then(function(x){ senkSuruyor = null; senkSesli = false; return x; });
+  return senkSuruyor;
 }
 
 /* =========================================================

@@ -32,7 +32,8 @@ function sorgula(q) {
   if ((m = /name = '([^']*)'/.exec(q))) l = l.filter(f => f.name === m[1].replace(/\\'/g, "'"));
   if ((m = /mimeType = '([^']*)'/.exec(q))) l = l.filter(f => f.mimeType === m[1]);
   if ((m = /mimeType != '([^']*)'/.exec(q))) l = l.filter(f => f.mimeType !== m[1]);
-  if ((m = /'([^']*)' in parents/.exec(q))) l = l.filter(f => (f.parents || []).includes(m[1]));
+  { const eb = [...q.matchAll(/'([^']*)' in parents/g)].map(x => x[1]);
+    if (eb.length) l = l.filter(f => (f.parents || []).some(u => eb.includes(u))); }
   if ((m = /modifiedTime > '([^']*)'/.exec(q))) l = l.filter(f => f.modifiedTime > m[1]);
   return l;
 }
@@ -70,7 +71,7 @@ function oturum(depo) {
         }
         const q = decodeURIComponent((/[?&]q=([^&]*)/.exec(u) || [, ""])[1]);
         return yanit({ files: sorgula(q).map(f => ({ id: f.id, name: f.name, parents: f.parents,
-                                                     mimeType: f.mimeType, size: f.size })) });
+                                                     mimeType: f.mimeType, size: f.size, modifiedTime: f.modifiedTime })) });
       };
     }
   });

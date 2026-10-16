@@ -14,7 +14,7 @@ tüm görüntüler ve tanılar kullanıcının kendi Google Drive'ında kalır.
 | `index.html` | Sayfa iskeleti ve tüm stiller |
 | `app.js` | Uygulamanın tamamı — Drive bağlantısı, arama, yükleme, düzenleme |
 | `manifest.webmanifest`, `sw.js`, `icon-*.png` | Telefon/masaüstü simgesi ve çevrimdışı açılış |
-| `test.js` | Sahte bir Drive üzerinde uçtan uca sınama (`node test.js`, jsdom gerektirir) |
+| `test.js`, `test-senk.js`, `test-kadro.js`, `dosya_test.js` | Sahte bir Drive üzerinde uçtan uca sınamalar (`node test.js` …, jsdom gerektirir) |
 
 ## Kurulum
 
@@ -53,12 +53,17 @@ tüm görüntüler ve tanılar kullanıcının kendi Google Drive'ında kalır.
 
 - **Dizin**: Drive'daki tüm klasörler tek sorguda çekilir, ağaç tarayıcıda kurulur.
   20 000 dosyalık arşiv için toplam birkaç istek yeter. Sonuç tarayıcıda saklanır.
-- **Otomatik eşitleme**: uygulama her açılışta Drive'a "son bakıştan beri hangi
-  dosyalar değişti" diye tek sorgu sorar, değişen dosyaların sahibi hastaları
-  klasör zincirini yürüyerek bulur ve yalnızca onları yeniden okur. Hiçbir şey
-  değişmemişse tek istekle biter. Böylece bilgisayarda yapılan değişiklik
-  telefonda da görünür. **Yenile** aynı kontrolü elle yapar; **Shift+Yenile**
-  arşivin tamamını baştan okur.
+- **Otomatik eşitleme**: uygulama her açılışta ve her **Yenile**'de iki şey yapar:
+  1. *Hasta listesi denetimi*: Drive'daki bütün hasta klasörleri tek sorguda çekilir ve
+     tarayıcıdaki listeyle karşılaştırılır. Başka cihazda açılan, silinen ya da adı
+     değişen hasta, kaç tane olursa olsun yakalanır; ekrandaki sayı her zaman Drive'daki
+     hasta klasörü sayısıdır.
+  2. *Değişen dosyalar*: son bakıştan beri değişen dosya ve klasörler tek sorguda çekilir,
+     hangi hastaya ait oldukları bilinen klasörlerden bulunur, yalnızca o hastalar
+     yeniden okunur.
+  Okunamayan bir hasta listeden düşmez, eski bilgisi kalır ve sonraki Yenile'de tekrar
+  denenir. Hiçbir şey değişmemişse üç istekte biter. **Shift+Yenile** arşivin tamamını
+  baştan okur.
 - **Sessiz giriş**: daha önce izin verildiyse uygulama açılırken Google'a
   kendiliğinden bağlanır, düğmeye basmaya gerek kalmaz.
 - **Yükleme**: `uploadType=resumable` ile 8 MB'lık dilimler hâlinde. Ağ koparsa
