@@ -1,6 +1,6 @@
 /* Basit kabuk önbelleği — uygulama çevrimdışı açılır, veriler Drive'dan gelir. */
-var SURUM = "arsiv-202610211345";
-var KABUK = ["./", "./index.html", "./app.js?v=202609171356", "./config.js?v=202609171356"];
+var SURUM = "arsiv-202610211430";
+var KABUK = ["./", "./index.html", "./app.js?v=202610161430", "./config.js?v=202610161430"];
 
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(SURUM).then(function (c) { return c.addAll(KABUK); }).then(function () { return self.skipWaiting(); }));
@@ -17,11 +17,14 @@ self.addEventListener("fetch", function (e) {
   /* Google API ve kimlik istekleri asla önbelleğe alınmaz */
   if (u.origin !== self.location.origin) return;
   if (e.request.method !== "GET") return;
-  /* HTML her zaman tazeden alınır; app.js/config.js zaten sürüm damgalı. */
+  /* HTML her zaman tazeden alınır. Betikler de her seferinde sunucuya sorulur
+     (değişmediyse 304, birkaç bayt); böylece yeni app.js, sayfadaki sürüm
+     damgası değişmese bile hemen gelir. */
   var kabukMu = e.request.mode === "navigate" || u.pathname.endsWith("/") ||
                 /\.(html|webmanifest)$/.test(u.pathname);
+  var betikMi = /\.js$/.test(u.pathname);
   e.respondWith(
-    fetch(e.request, kabukMu ? { cache: "reload" } : undefined).then(function (y) {
+    fetch(e.request, kabukMu ? { cache: "reload" } : (betikMi ? { cache: "no-cache" } : undefined)).then(function (y) {
       var kopya = y.clone();
       caches.open(SURUM).then(function (c) { c.put(e.request, kopya); }).catch(function () {});
       return y;
