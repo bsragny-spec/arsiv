@@ -14,7 +14,7 @@ tüm görüntüler ve tanılar kullanıcının kendi Google Drive'ında kalır.
 | `index.html` | Sayfa iskeleti ve tüm stiller |
 | `app.js` | Uygulamanın tamamı — Drive bağlantısı, arama, yükleme, düzenleme |
 | `manifest.webmanifest`, `sw.js`, `icon-*.png` | Telefon/masaüstü simgesi ve çevrimdışı açılış |
-| `test.js`, `test-senk.js`, `test-kadro.js`, `dosya_test.js` | Sahte bir Drive üzerinde uçtan uca sınamalar (`node test.js` …, jsdom gerektirir) |
+| `test.js`, `test-senk.js`, `test-kadro.js`, `test-form.js`, `dosya_test.js` | Sahte bir Drive üzerinde uçtan uca sınamalar (`node test.js` …, jsdom gerektirir) |
 
 ## Kurulum
 
@@ -70,6 +70,11 @@ tüm görüntüler ve tanılar kullanıcının kendi Google Drive'ında kalır.
   kaldığı bayttan devam eder. Boyut sınırı yoktur, dosya hiç dönüştürülmez.
 - **Önizleme**: Drive'ın kendi küçük resimleri kullanılır — HEIC gibi tarayıcının
   açamadığı biçimler de görünür.
+- **Yeni kayıt / Vizit ekle**: form her zaman tek bir hastaya aittir. Başka hastaya
+  geçince, kayıt bitince ya da ✕ (veya Esc) ile kapatınca tamamen temizlenir; önceki
+  hastanın tanısı, tarihi, teknikleri ya da dosyaları bir sonrakine taşınmaz. Vizit
+  eklerken tanı alanında hastanın kayıtlı tanısı görünür ve yalnızca değiştirilirse
+  yazılır. Gönderilemeyen görüntü olursa form açık kalır, yalnızca o dosyalar bekler.
 - **Silme**: her şey **çöp kutusuna** taşınır (`trashed: true`), kalıcı silme yapılmaz.
 - **Tanı**: hasta klasöründe `TANI - <metin>.txt` dosyası olarak tutulur; yeni tanı
   yazılınca eskisi çöp kutusuna gider.

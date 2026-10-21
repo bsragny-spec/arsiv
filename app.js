@@ -1079,43 +1079,106 @@ function yolCiz(){
     + esc(tekler.length ? tekler.join(", ") : "TEKNİK") + "</b>";
 
   var ip = $("adipucu");
-  if(ad.length >= 3 && yeniDoku){
+  if(kilitliHasta){ ip.textContent = ""; }
+  else if(ad.length >= 3 && yeniDoku){
     var p = hastaBul(yeniDoku, ad);
     ip.textContent = p ? ("Arşivde var — " + p.v.length + " vizit kayıtlı. Yeni vizit bu hastaya eklenecek.")
                        : "Arşivde yok — yeni hasta klasörü açılacak.";
   } else ip.textContent = "";
 }
 
-function vizitEkleBaslat(p){
+/* ---------- form durumu ----------
+   Form her zaman tek bir hastaya aittir. Başka hastaya geçerken, kayıt bitince
+   ya da ✕ ile kapatınca tamamen sıfırlanır: önceki hastanın tanısı, tarihi,
+   teknikleri ya da dosyaları bir sonrakine taşınmaz. Ara sekmesine geçmek
+   taslağı silmez (bir şeye bakıp geri dönülebilir). */
+var sonKayit = null;   /* başarıyla biten son kayıt: { p, tk } */
+
+function formuSifirla(sonucuTut){
+  kilitliHasta = null; yeniDoku = null; yeniTek = {}; secilenDosyalar = []; hedefTeknik = null;
+  $("nad").value = ""; $("nad").readOnly = false;
+  $("ntarih").value = "";
+  $("ntani").value = "";
+  if(!sonucuTut) $("cikti").innerHTML = "";
+  kapatmaOnayiniKaldir();
+  formBasCiz();
+  formCiz();
+}
+
+function formBasCiz(){
+  var p = kilitliHasta;
+  $("formbaslik").textContent = p ? "Vizit ekle" : "Yeni hasta";
+  $("formalt").innerHTML = p
+    ? '<span class="hasta-cip" style="' + dokuRenk(p.d) + '">' + esc(p.h) + '</span> · ' + esc(p.d)
+      + (p.v && p.v.length ? " · " + p.v.length + " vizit kayıtlı" : "")
+    : "Doku, ad, vizit tarihi ve en az bir teknik seç.";
+  $("tab-yeni").textContent = p ? "Vizit ekle" : "Yeni kayıt";
+  var ip = $("tanipucu");
+  ip.hidden = !p;
+  ip.textContent = !p ? "" : (p.t ? "Hastanın kayıtlı tanısı. Değiştirmezsen aynen kalır."
+                                   : "Bu hastanın kayıtlı tanısı yok.");
+}
+
+function vizitEkleBaslat(p, tarih){
+  formuSifirla();
   kilitliHasta = p;
   yeniDoku = p.d;
   $("nad").value = p.h; $("nad").readOnly = true;
-  var kk = $("kilitkutu");
-  kk.hidden = false;
-  kk.innerHTML = '<div class="serit bilgi">Var olan hastaya vizit ekleniyor: <b>' + esc(p.h) + '</b> · ' + esc(p.d)
-    + ' <button class="lnk" id="kilitcoz" style="margin-left:8px">vazgeç</button></div>';
-  $("kilitcoz").addEventListener("click", kilidiCoz);
+  $("ntani").value = p.t || "";
+  if(tarih) $("ntarih").value = tarih.slice(0, 4) + "-" + tarih.slice(4, 6) + "-" + tarih.slice(6, 8);
+  formBasCiz();
   sekmeSec("yeni");
   formCiz();
-  $("ntarih").focus();
+  if(!tarih) $("ntarih").focus();
 }
-function kilidiCoz(){
-  kilitliHasta = null;
-  $("nad").readOnly = false; $("nad").value = "";
-  $("kilitkutu").hidden = true; $("kilitkutu").innerHTML = "";
-  formCiz();
+
+/* Kaydedilmemiş bir şey var mı? (hastanın kilitli olması tek başına sayılmaz) */
+function taslakVar(){
+  var p = kilitliHasta, tani = $("ntani").value.trim();
+  if(secilenDosyalar.length || seciliTeknikler().length || $("ntarih").value) return true;
+  if(!p && ($("nad").value.trim() || yeniDoku)) return true;
+  return p ? (!!tani && nrm(tani) !== nrm(p.t || "")) : !!tani;
+}
+function yuklemeSuruyor(){ return !$("iptal").hidden; }
+
+function formuKapat(){
+  if(yuklemeSuruyor()) return;
+  if(!taslakVar()){ formuSifirla(); sekmeSec("ara"); return; }
+  var sag = $("formsag");
+  if(sag.querySelector(".onay")) return;
+  var mesaj = secilenDosyalar.length
+    ? secilenDosyalar.length + " görüntü henüz yüklenmedi. Kapatılsın mı?"
+    : "Girdiğin bilgiler silinsin mi?";
+  var onay = document.createElement("span");
+  onay.className = "onay";
+  onay.innerHTML = esc(mesaj) + ' <button type="button" class="evet">Kapat</button><button type="button" class="hayir">Vazgeç</button>';
+  $("formkapat").hidden = true;
+  sag.appendChild(onay);
+  onay.querySelector(".hayir").addEventListener("click", kapatmaOnayiniKaldir);
+  onay.querySelector(".evet").addEventListener("click", function(){ formuSifirla(); sekmeSec("ara"); });
+  onay.querySelector(".hayir").focus();
+}
+function kapatmaOnayiniKaldir(){
+  var o = $("formsag").querySelector(".onay"); if(o) o.remove();
+  $("formkapat").hidden = false;
 }
 
 function kayitOlustur(){
   var doku = yeniDoku, ad = $("nad").value.trim(), tk = tarihKodu();
   var tekler = seciliTeknikler(), tani = $("ntani").value.trim();
   var yuklenecek = secilenDosyalar.filter(function(x){ return x.t; });
+  /* Tanı yalnızca değiştiyse yazılır; boş bırakmak mevcut tanıya dokunmaz. */
+  var mevcutHasta = hastaBul(doku, ad);
+  var taniYaz = !!tani && nrm(tani) !== nrm((mevcutHasta && mevcutHasta.t) || "");
+  var tamam = [], yukSay = {};   /* gönderilen/var olan dosyalar · teknik başına yeni yüklenen */
   durduruldu = false;
 
   var cikti = $("cikti");
   cikti.innerHTML = "";
   $("olustur").disabled = true;
   $("iptal").hidden = false;
+  $("formkapat").disabled = true;
+  kapatmaOnayiniKaldir();
   $("ilerleme").hidden = yuklenecek.length === 0;
   $("pfill").style.width = "0%";
 
@@ -1139,7 +1202,7 @@ function kayitOlustur(){
     })
     .then(function(){
       satir("Klasörler hazır: " + KOK_AD + " / " + doku + " / " + ad + " / " + tk, "iyi");
-      if(!tani) return null;
+      if(!taniYaz) return null;
       return hepsiniListele("'" + hastaKlasor.id + "' in parents and trashed = false", "id,name,mimeType")
         .then(function(l){
           var eskiler = l.filter(function(x){ return x.mimeType !== KLASOR && x.name.indexOf("TANI - ") === 0; });
@@ -1166,7 +1229,7 @@ function kayitOlustur(){
           $("ptext").textContent = x.t + " — " + x.f.name;
           $("pnum").textContent = (i + 1) + " / " + yuklenecek.length;
           if(mevcut[x.t] && mevcut[x.t][x.f.name]){
-            atlandi++; gidenBayt += x.f.size;
+            atlandi++; tamam.push(x); gidenBayt += x.f.size;
             $("pfill").style.width = Math.round(100 * gidenBayt / toplamBayt) + "%";
             return null;
           }
@@ -1175,7 +1238,7 @@ function kayitOlustur(){
             var t = oncekiBayt + giden;
             $("pfill").style.width = Math.round(100 * t / toplamBayt) + "%";
           }).then(function(){
-            yuklendi++;
+            yuklendi++; tamam.push(x); yukSay[x.t] = (yukSay[x.t] || 0) + 1;
           }).catch(function(err){
             basarisiz.push({ ad: x.f.name, mesaj: err.message });
           }).then(function(){
@@ -1199,23 +1262,36 @@ function kayitOlustur(){
       var p = hastaBul(doku, ad);
       if(!p){ p = { d: doku, h: ad, t: "", g: hastaKlasor.id, v: [] }; VERI.push(p); }
       p.g = hastaKlasor.id;
-      if(tani) p.t = tani;
+      if(taniYaz) p.t = tani;
       var v = null;
       for(var i = 0; i < p.v.length; i++){ if(p.v[i].t === tk){ v = p.v[i]; break; } }
       if(!v){ v = { t: tk, id: vizitKlasor.id, k: {} }; p.v.push(v); }
       v.id = vizitKlasor.id;
       tekler.forEach(function(t){
-        var n = yuklenecek.filter(function(x){ return x.t === t; }).length;
         var eski = v.k[t] ? (v.k[t].n || 0) : 0;
-        v.k[t] = { id: tekKlasor[t].id, n: Math.max(eski, n) };
+        v.k[t] = { id: tekKlasor[t].id, n: eski + (yukSay[t] || 0) };
       });
       hazirla(); dizinKaydet(); cipleriKur(); ciz();
-      cikti.insertAdjacentHTML("beforeend",
-        '<div class="serit iyi" style="margin-top:10px">Kayıt hazır. '
-        + '<a href="https://drive.google.com/drive/folders/' + esc(vizitKlasor.id) + '" target="_blank" rel="noopener">Vizit klasörünü Drive’da aç →</a></div>');
-      secilenDosyalar = [];
-      if(!kilitliHasta){ $("ntani").value = ""; }
-      dosyaSatirlariCiz();
+
+      var link = '<a href="https://drive.google.com/drive/folders/' + esc(vizitKlasor.id)
+               + '" target="_blank" rel="noopener">Drive’da aç →</a>';
+      var kalan = yuklenecek.filter(function(x){ return tamam.indexOf(x) < 0; });
+      if(kalan.length){
+        /* gitmeyenler listede kalır; form bu hastada açık kalır */
+        secilenDosyalar = kalan;
+        cikti.insertAdjacentHTML("beforeend",
+          '<div class="serit uyari" style="margin-top:10px">' + kalan.length + ' görüntü gönderilemedi, listede bekliyor. '
+          + '<b>Kaydı oluştur</b>’a yeniden basınca yalnızca bunlar gider. ' + link + '</div>');
+        dosyaSatirlariCiz();
+      } else {
+        sonKayit = { p: p, tk: tk };
+        cikti.insertAdjacentHTML("beforeend",
+          '<div class="serit iyi" style="margin-top:10px"><b>Kayıt hazır:</b> ' + esc(ad) + ' · ' + esc(gunAy(tk)) + '. ' + link
+          + '<div style="margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+          +   '<button type="button" class="dg dg-mini" data-aynivizit>Bu vizite başka görüntü ekle</button>'
+          +   '<span class="not">Form bir sonraki hasta için temizlendi.</span></div></div>');
+        formuSifirla(true);
+      }
     })
     .catch(function(err){
       satir("İşlem yarıda kaldı: " + err.message, "kotu");
@@ -1223,6 +1299,7 @@ function kayitOlustur(){
     .then(function(){
       $("olustur").disabled = false;
       $("iptal").hidden = true;
+      $("formkapat").disabled = false;
       $("ilerleme").hidden = true;
       $("ptext").textContent = ""; $("pnum").textContent = "";
       yolCiz();
@@ -1293,6 +1370,16 @@ function olaylariBagla(){
   });
 
   $("olustur").addEventListener("click", kayitOlustur);
+  $("formkapat").addEventListener("click", formuKapat);
+  $("cikti").addEventListener("click", function(e){
+    if(e.target.closest("[data-aynivizit]") && sonKayit) vizitEkleBaslat(sonKayit.p, sonKayit.tk);
+  });
+  document.addEventListener("keydown", function(e){
+    if(e.key !== "Escape" || $("panel-yeni").hidden || buyutecDurum) return;
+    if($("formsag").querySelector(".onay")){ kapatmaOnayiniKaldir(); return; }
+    formuKapat();
+  });
+  formBasCiz();
   $("iptal").addEventListener("click", function(){ durduruldu = true; $("iptal").disabled = true; });
 
   $("yenile").addEventListener("click", function(e){
